@@ -5,12 +5,15 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Dict, List, Optional, Union
 
-logging.basicConfig(level=logging.INFO, format='%(name)s : %(levelname)-8s : %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(name)s : %(levelname)-8s : %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
 # This code is originally sourced from Repository STORM
 # URL: [https://github.com/stanford-oval/storm]
+
 
 class Information(ABC):
     """Abstract base class to represent basic information.
@@ -74,7 +77,9 @@ class article(ABC):
     def __init__(self, topic_name):
         self.root = articleSectionNode(topic_name)
 
-    def find_section(self, node: articleSectionNode, name: str) -> Optional[articleSectionNode]:
+    def find_section(
+        self, node: articleSectionNode, name: str
+    ) -> Optional[articleSectionNode]:
         """
         Return the node of the section given the section name.
 
@@ -144,12 +149,13 @@ class article(ABC):
         """
         return [i.section_name for i in self.root.children]
 
-
     def prune_empty_nodes(self, node=None):
         if node is None:
             node = self.root
 
-        node.children[:] = [child for child in node.children if self.prune_empty_nodes(child)]
+        node.children[:] = [
+            child for child in node.children if self.prune_empty_nodes(child)
+        ]
 
         if (node.content is None or node.content == "") and not node.children:
             return None
@@ -175,7 +181,9 @@ class Retriever(ABC):
     def collect_and_reset_rm_usage(self):
         combined_usage = []
         for attr_name in self.__dict__:
-            if '_rm' in attr_name and hasattr(getattr(self, attr_name), 'get_usage_and_reset'):
+            if "_rm" in attr_name and hasattr(
+                getattr(self, attr_name), "get_usage_and_reset"
+            ):
                 combined_usage.append(getattr(self, attr_name).get_usage_and_reset())
 
         name_to_usage = {}
@@ -237,7 +245,9 @@ class OutlineGenerationModule(ABC):
     """
 
     @abstractmethod
-    def generate_outline(self, topic: str, information_table: InformationTable, **kwargs) -> article:
+    def generate_outline(
+        self, topic: str, information_table: InformationTable, **kwargs
+    ) -> article:
         """
         Generate outline for the article. Required arguments include:
             topic: the topic of interest
@@ -260,11 +270,13 @@ class articleGenerationModule(ABC):
     """
 
     @abstractmethod
-    def generate_article(self,
-                         topic: str,
-                         information_table: InformationTable,
-                         article_with_outline: article,
-                         **kwargs) -> article:
+    def generate_article(
+        self,
+        topic: str,
+        information_table: InformationTable,
+        article_with_outline: article,
+        **kwargs,
+    ) -> article:
         """
         Generate article. Required arguments include:
             topic: the topic of interest
@@ -309,14 +321,15 @@ def log_execution_time(func):
 class LMConfigs(ABC):
     """Abstract base class for language model configurations of the knowledge curation engine.
 
-    The language model used for each part should be declared with a suffix '_lm' in the attribute name."""
+    The language model used for each part should be declared with a suffix '_lm' in the attribute name.
+    """
 
     def __init__(self):
         pass
 
     def init_check(self):
         for attr_name in self.__dict__:
-            if '_lm' in attr_name and getattr(self, attr_name) is None:
+            if "_lm" in attr_name and getattr(self, attr_name) is None:
                 logging.warning(
                     f"Language model for {attr_name} is not initialized. Please call set_{attr_name}()"
                 )
@@ -324,7 +337,7 @@ class LMConfigs(ABC):
     def collect_and_reset_lm_history(self):
         history = []
         for attr_name in self.__dict__:
-            if '_lm' in attr_name and hasattr(getattr(self, attr_name), 'history'):
+            if "_lm" in attr_name and hasattr(getattr(self, attr_name), "history"):
                 history.extend(getattr(self, attr_name).history)
                 getattr(self, attr_name).history = []
 
@@ -333,7 +346,9 @@ class LMConfigs(ABC):
     def collect_and_reset_lm_usage(self):
         combined_usage = []
         for attr_name in self.__dict__:
-            if '_lm' in attr_name and hasattr(getattr(self, attr_name), 'get_usage_and_reset'):
+            if "_lm" in attr_name and hasattr(
+                getattr(self, attr_name), "get_usage_and_reset"
+            ):
                 combined_usage.append(getattr(self, attr_name).get_usage_and_reset())
 
         model_name_to_usage = {}
@@ -342,8 +357,12 @@ class LMConfigs(ABC):
                 if model_name not in model_name_to_usage:
                     model_name_to_usage[model_name] = tokens
                 else:
-                    model_name_to_usage[model_name]['prompt_tokens'] += tokens['prompt_tokens']
-                    model_name_to_usage[model_name]['completion_tokens'] += tokens['completion_tokens']
+                    model_name_to_usage[model_name]["prompt_tokens"] += tokens[
+                        "prompt_tokens"
+                    ]
+                    model_name_to_usage[model_name]["completion_tokens"] += tokens[
+                        "completion_tokens"
+                    ]
 
         return model_name_to_usage
 
@@ -351,8 +370,9 @@ class LMConfigs(ABC):
 
         return OrderedDict(
             {
-                attr_name: getattr(self, attr_name).kwargs for attr_name in self.__dict__ if
-                '_lm' in attr_name and hasattr(getattr(self, attr_name), 'kwargs')
+                attr_name: getattr(self, attr_name).kwargs
+                for attr_name in self.__dict__
+                if "_lm" in attr_name and hasattr(getattr(self, attr_name), "kwargs")
             }
         )
 
@@ -376,16 +396,21 @@ class Engine(ABC):
             self.time[func.__name__] = execution_time
             logger.info(f"{func.__name__} executed in {execution_time:.4f} seconds")
             self.lm_cost[func.__name__] = self.lm_configs.collect_and_reset_lm_usage()
-            if hasattr(self, 'retriever'):
-                self.rm_cost[func.__name__] = self.retriever.collect_and_reset_rm_usage()
+            if hasattr(self, "retriever"):
+                self.rm_cost[func.__name__] = (
+                    self.retriever.collect_and_reset_rm_usage()
+                )
             return result
 
         return wrapper
 
     def apply_decorators(self):
         """Apply decorators to methods that need them."""
-        methods_to_decorate = [method_name for method_name in dir(self)
-                               if callable(getattr(self, method_name)) and method_name.startswith('run_')]
+        methods_to_decorate = [
+            method_name
+            for method_name in dir(self)
+            if callable(getattr(self, method_name)) and method_name.startswith("run_")
+        ]
         for method_name in methods_to_decorate:
             original_method = getattr(self, method_name)
             decorated_method = self.log_execution_time_and_lm_rm_usage(original_method)

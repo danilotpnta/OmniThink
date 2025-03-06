@@ -1,5 +1,4 @@
 import os
-import sys
 from argparse import ArgumentParser
 from src.tools.lm import DeepSeekModel
 from src.tools.rm import GoogleSearchAli

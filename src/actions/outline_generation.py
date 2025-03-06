@@ -1,45 +1,48 @@
 import dspy
 from src.tools.mindmap import MindMap
 from src.utils.ArticleTextProcessing import ArticleTextProcessing
-from typing import Union, Optional, Tuple
 
 # This code is originally sourced from Repository STORM
 # URL: [https://github.com/stanford-oval/storm]
 
-class OutlineGenerationModule():
 
-    def __init__(self,
-                 outline_gen_lm: Union[dspy.dsp.LM, dspy.dsp.HFModel]):
+class OutlineGenerationModule:
+
+    def __init__(self, outline_gen_lm: dspy.LM):
         super().__init__()
         self.outline_gen_lm = outline_gen_lm
         self.write_outline = WriteOutline(engine=self.outline_gen_lm)
 
-    def generate_outline(self,
-                         topic: str,
-                         mindmap: MindMap,
-                         ):
+    def generate_outline(
+        self,
+        topic: str,
+        mindmap: MindMap,
+    ):
 
         concepts = mindmap.export_categories_and_concepts()
         result = self.write_outline(topic=topic, concepts=concepts)
 
         return result
 
+
 class WriteOutline(dspy.Module):
     """Generate the outline for the Wikipedia page."""
 
-    def __init__(self, engine: Union[dspy.dsp.LM, dspy.dsp.HFModel]):
+    def __init__(self, engine: dspy.LM):
         super().__init__()
         self.draft_page_outline = dspy.Predict(WritePageOutline)
         self.polish_page_outline = dspy.Predict(PolishPageOutline)
         self.engine = engine
 
     def forward(self, topic: str, concepts: str):
-        
+
         with dspy.settings.context(lm=self.engine):
             outline = ArticleTextProcessing.clean_up_outline(
-                self.draft_page_outline(topic=topic).outline)
+                self.draft_page_outline(topic=topic).outline
+            )
             outline = ArticleTextProcessing.clean_up_outline(
-                self.polish_page_outline(draft=outline, concepts=concepts).outline)
+                self.polish_page_outline(draft=outline, concepts=concepts).outline
+            )
 
         return outline
 
@@ -54,8 +57,10 @@ class PolishPageOutline(dspy.Signature):
     """
 
     draft = dspy.InputField(prefix="Current outline:\n ", format=str)
-    concepts = dspy.InputField(prefix="The information you learned from the conversation:\n", format=str)
-    outline = dspy.OutputField(prefix='Write the page outline:\n', format=str)
+    concepts = dspy.InputField(
+        prefix="The information you learned from the conversation:\n", format=str
+    )
+    outline = dspy.OutputField(prefix="Write the page outline:\n", format=str)
 
 
 class WritePageOutline(dspy.Signature):
@@ -69,4 +74,3 @@ class WritePageOutline(dspy.Signature):
 
     topic = dspy.InputField(prefix="The topic you want to write: ", format=str)
     outline = dspy.OutputField(prefix="Write the Wikipedia page outline:\n", format=str)
-

@@ -1,10 +1,7 @@
 import os
-import json
-import re
 import numpy as np
 from argparse import ArgumentParser
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from FActScore.factscore.atomic_facts import AtomicFactGenerator, normalize_answer
 from trim import process_document
 
