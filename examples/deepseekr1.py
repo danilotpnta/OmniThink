@@ -83,5 +83,11 @@ if __name__ == '__main__':
     parser.add_argument('--depth', type=int, default=2,
                         help='The depth of knowledge seeking.')
 
-
+    """
+    cd pipeline/omnithink/
+    python -m examples.deepseekr1 \
+        --retriever google \
+        --llm deepseek-reasoner \
+        --depth 1
+    """
     main(parser.parse_args())
