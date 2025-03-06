@@ -1,8 +1,0 @@
-.idea
-hugging_cache
-**/__pycache__
-.vscode
-logs
-results
-output
-scripts
