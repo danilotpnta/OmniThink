@@ -1,33 +1,53 @@
 import os
-import json
-import re
-import numpy as np
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from prometheus_eval import PrometheusEval
 from prometheus_eval.prompts import ABSOLUTE_PROMPT, SCORE_RUBRIC_TEMPLATE
-from FActScore.factscore.atomic_facts import AtomicFactGenerator, normalize_answer
-from prometheus_eval.litellm import LiteLLM
 from prometheus_eval.vllm import VLLM
 
-from trim import process_document
+
+import os
+import logging
+import argparse
+
+import pandas as pd
+from tqdm import tqdm
+from collections import defaultdict
+
+from eval.bin.utils import process_document
+from eval.metrics import article_entity_recall, compute_rouge_scores
+
+from config.paths import hf_cache_dir
+from src.utils import dump_json as save_results
+from src.utils import (
+    domain_mapping,
+    load_json,
+    load_str,
+    setup_logging,
+    get_logger,
+    format_args,
+)
+
+setup_logging(level=logging.INFO)
+logger = get_logger(__name__)
 
 
 class ComprehensiveEvaluator:
     def __init__(self, model_path):
         model = VLLM(model=model_path)
         self.judge = PrometheusEval(
-            model=model, absolute_grade_template=ABSOLUTE_PROMPT
+            model=model,
+            absolute_grade_template=ABSOLUTE_PROMPT,
         )
 
     def grade(self, rubric_data, topic, response):
         instruction = f"You are an experienced writer, and you need to write an article for the topic: {topic}."
         params = {
-            "max_tokens": 2048,
+            "temperature": 0.01,
+            "top_p": 0.95,
+            "max_tokens": 512,
             "repetition_penalty": 1.03,
             "best_of": 1,
-            "temperature": 1.0,
-            "top_p": 0.9,
         }
         rubric = SCORE_RUBRIC_TEMPLATE.format(**rubric_data)
         feedback, score = self.judge.single_absolute_grade(
@@ -106,18 +126,34 @@ class ComprehensiveEvaluator:
 
 
 def main(args):
-    model_path = args.modelpath
-    stor_path = args.articlepath
 
-    evaluator = ComprehensiveEvaluator(model_path=model_path)
+    evaluator = ComprehensiveEvaluator(model_path=args.model)
+    
+    df = pd.read_csv(args.input_path)
+    df_sorted = df.sort_values(by=["domain", "concept"])
+    aggregated_results = defaultdict(list)
 
-    # Replace with your file paths
     file_paths = []
-    for dirs in os.listdir(stor_path):
-        topic = dirs.replace("_", " ")
-        txt_path = os.path.join(stor_path, dirs)
-        file_paths.append(txt_path)
+    for _, row in tqdm(
+        df_sorted.iterrows(),
+        total=len(df_sorted),
+        desc="Processing topics",
+    ):
+        domain = row["domain"]
+        topic = row["concept"]
+        topic_name = topic.replace(" ", "_")
 
+        pred_article_path = os.path.join(
+            args.pred_dir,
+            domain_mapping.get(domain, ""),
+            args.run_to_evaluate,
+            topic_name,
+            args.pred_file_name,
+        )
+        file_paths.append(pred_article_path)
+    print(file_paths)
+    import sys
+    sys.exit(0)
     Relevance_results = evaluator.evaluate_files(file_paths, evaluator.Relevance)
     avg_Relevance_score = sum(r["score"] for r in Relevance_results) / len(
         Relevance_results
@@ -142,23 +178,22 @@ def main(args):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-
-    # parser.add_argument('--articlepath', type=str, default='../results/article',
-    #                     help='Directory to store the articles.')
-    # parser.add_argument('--modelpath', type=str, default='./models/prometheus-7b-v2.0',
-    #                     help='Directory to store the model.')
-
     parser.add_argument(
-        "--articlepath",
+        "--input_path",
         type=str,
-        default="./outputs/ominihink/gen_articles/",
-        help="Directory to store the articles.",
+        help="Using csv file to store topic and ground truth url at present.",
     )
     parser.add_argument(
-        "--modelpath",
+        "--pred_dir",
         type=str,
-        default=f'{os.getenv("HF_HOME")}/hub/prometheus-7b-v2.0', #TODO: Fix this
-        help="Directory to store the model.",
+        default="./outputs/ominithink/gen_articles/",
+        help="Path of generated articles.",
+    )
+    parser.add_argument(
+        "--pred_file_name",
+        default="_gen_article_polished.txt",
+        type=str,
+        help="Name of the article file to be evaluated.",
     )
     parser.add_argument(
         "--model",
@@ -167,7 +202,39 @@ if __name__ == "__main__":
             "kaist-ai/prometheus-7b-v1.0",
             "prometheus-eval/prometheus-7b-v2.0",
         ],
-        default="kaist-ai/prometheus-13b-v1.0",
+        default="prometheus-eval/prometheus-7b-v2.0",
         help="Prometheus model variant.",
     )
+    parser.add_argument(
+        "--pipeline",
+        type=str,
+        default="storm",
+        choices=["storm", "apollo"],
+        help="The pipeline to use for generating articles.",
+    )
+    parser.add_argument(
+        "--jobid",
+        type=str,
+        required=False,
+        help="Slurm job ID",
+    )
+    parser.add_argument(
+        "--run_to_evaluate",
+        type=str,
+        default="641_non_deterministic",
+        help="The run ID to evaluate.",
+    )
+    args = parser.parse_args()
+    args.pred_file_name = f"{args.pipeline}_gen_article_polished.txt"
+
+    model_name = args.model.split("/")[-1]
+    args.result_output_dir = os.path.join(
+        args.result_output_dir,
+        model_name,
+        args.jobid or "",
+    )
+
+    if not os.path.exists(args.result_output_dir):
+        os.makedirs(args.result_output_dir)
+        logger.info(f"Directory {args.result_output_dir} created.")
     main(parser.parse_args())
