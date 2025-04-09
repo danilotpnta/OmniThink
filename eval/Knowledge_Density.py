@@ -4,6 +4,31 @@ from argparse import ArgumentParser
 
 from FActScore.factscore.atomic_facts import AtomicFactGenerator, normalize_answer
 from trim import process_document
+from ..src.tools.lm import *
+
+def deduplicate_atomic_facts(all_facts):
+    """Deduplicate atomic facts by normalizing them and removing duplicates."""
+
+    prompt = """
+    You need to remove atomic knowledge facts with repetitive content from the following list. 
+    Even if the expressions differ but convey the same fact, they should be considered duplicates and deleted.
+    Here are the facts:
+
+    """ + "\n".join(["- " + fact for fact in all_facts]) + """
+
+    Please output only the deduplicated atomic facts, formatted as follows:
+    - atomic fact 1
+    - atomic fact 2
+    - atomic fact 3
+    ...
+    """
+    lm = OpenAIModel_dashscope(model='gpt-4o', max_tokens=2000)
+    output = lm(prompt)[0]
+
+    output = re.findall(r"-\s*(.*)", output)
+    
+    # Return deduplicated atomic facts
+    return output
 
 def knowledge_density_grade(response, api_path):        
     lines = response.split('\n')
@@ -21,13 +46,13 @@ def knowledge_density_grade(response, api_path):
     num_splits = int(len(response)/3000)
     split_facts = np.array_split(all_facts, num_splits)
 
-    deduplicated_splits = [generator.deduplicate_atomic_facts(split.tolist()) for split in split_facts]
+    deduplicated_splits = [deduplicate_atomic_facts(split.tolist()) for split in split_facts]
 
     combined_facts = []
     for deduplicated_part in deduplicated_splits:
         combined_facts += deduplicated_part
 
-    deduplicated_facts = generator.deduplicate_atomic_facts(combined_facts)
+    deduplicated_facts = deduplicate_atomic_facts(combined_facts)
     
     return len(deduplicated_facts)/len(response)
 

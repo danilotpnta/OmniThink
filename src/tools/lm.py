@@ -4,7 +4,8 @@ import time
 import dspy
 import os
 from openai import OpenAI
-from typing import Optional, Any
+from zhipuai import ZhipuAI
+from typing import Optional, Literal, Any
 from dashscope import Generation
 
 # This code is originally sourced from Repository STORM
@@ -21,7 +22,8 @@ class OpenAIModel_dashscope(dspy.OpenAI):
         api_key: Optional[str] = None,
         **kwargs,
     ):
-        super().__init__(model=model, api_key=api_key, **kwargs)
+        super().__init__(model=model, api_key=api_key, base_url='https://api.gpts.vin/', **kwargs)
+        print(model)
         self.model = model
         self._token_usage_lock = threading.Lock()
         self.max_tokens = max_tokens
@@ -76,11 +78,11 @@ class OpenAIModel_dashscope(dspy.OpenAI):
             stream=False,
         )
         import requests
-
-        max_try = 3
+        max_try = 10
         for i in range(max_try):
             try:
-                ret = requests.post(CALL_URL, json=kwargs, headers=HEADERS, timeout=180)
+                ret = requests.post(CALL_URL, json=kwargs,
+                                    headers=HEADERS, timeout=1000)
                 if ret.status_code != 200:
                     raise Exception(
                         f"http status_code: {ret.status_code}\n{ret.content}"
