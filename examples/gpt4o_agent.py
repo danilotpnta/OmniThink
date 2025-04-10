@@ -3,13 +3,13 @@ import sys
 import yaml
 import re
 from argparse import ArgumentParser
-from src.actions.article_generation import ArticleGenerationModule
-from src.actions.article_polish import ArticlePolishingModule
-from src.actions.outline_generation import OutlineGenerationModule
-from src.dataclass.Article import Article
-from src.tools.lm import OpenAIModel_dashscope
-from src.tools.mindmap import MindMap
-from src.tools.rm import GoogleSearchAli
+from ..src.actions.article_generation import ArticleGenerationModule
+from ..src.actions.article_polish import ArticlePolishingModule
+from ..src.actions.outline_generation import OutlineGenerationModule
+from ..src.dataclass.Article import Article
+from ..src.tools.lm import OpenAIModel_dashscope
+from ..src.tools.mindmap import MindMap
+from ..src.tools.rm import GoogleSearchAli
 
 
 def load_config(config_path: str) -> dict:
