@@ -175,21 +175,41 @@ class MindMap:
 
         for count in range(self.depth):
             next_level = []
-
+            
+            # Yield the current level before processing children.
             yield current_level
-            if count == self.depth - 1:  # Check if it's the last layer
+            
+            # If it's the last layer, break out of the loop.
+            if count == self.depth - 1:
                 break
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                futures = {executor.submit(node.extend): node for node in current_level}
-
-                for future in concurrent.futures.as_completed(futures):
-                    node = futures[future]
-                    # Assuming extend populates children.
-                    next_level.extend(node.children.values())
-
+            
+            for node in current_level:
+                node.extend() 
+                next_level.extend(node.children.values())
+            
+            # Optionally, yield the current level after processing (if that's intended).
             yield current_level
+            
+            # Move to the next level.
             current_level = next_level
+
+        # for count in range(self.depth):
+        #     next_level = []
+
+        #     yield current_level
+        #     if count == self.depth - 1:  # Check if it's the last layer
+        #         break
+
+        #     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        #         futures = {executor.submit(node.extend): node for node in current_level}
+
+        #         for future in concurrent.futures.as_completed(futures):
+        #             node = futures[future]
+        #             # Assuming extend populates children.
+        #             next_level.extend(node.children.values())
+
+        #     yield current_level
+        #     current_level = next_level
 
     def recursive_extend(self, node: MindPoint, count: int):
         if count >= self.depth:
