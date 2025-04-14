@@ -1,0 +1,12 @@
+tmp/
+lib/
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+
+*.py[cod]
+*.egg-info/
+*.egg
+*.whl
+*.tar.gz
