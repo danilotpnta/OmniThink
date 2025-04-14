@@ -1,12 +1,17 @@
-tmp/
-lib/
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
-.DS_Store
 
-*.py[cod]
+# Packages
 *.egg-info/
 *.egg
 *.whl
 *.tar.gz
+
+# Mac
+.DS_Store
+
+# Temporary
+tmp/
+lib/
