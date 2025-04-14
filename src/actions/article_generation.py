@@ -20,7 +20,7 @@ class ArticleGenerationModule:
 
     def __init__(self,
                  retriever,
-                 article_gen_lm=Union[dspy.dsp.LM, dspy.dsp.HFModel],
+                 article_gen_lm=dspy.LM,
                  retrieve_top_k: int = 10,
                  max_thread_num: int = 10,
                  agent_name: str = 'WriteSection' ,
@@ -100,15 +100,15 @@ class ArticleGenerationModule:
 
 class ConvToSection(dspy.Module):
     """Use the information collected from the information-seeking conversation to write a section."""
-    def __init__(self, engine: Union[dspy.dsp.LM, dspy.dsp.HFModel]):
-        super().__init__()
-        # self.write_section = dspy.Predict(WriteSection)
-        current_module = globals()
-        if class_name in current_module:
-            cls = current_module.get(class_name)
-            self.write_section = dspy.Predict(cls)
-        else:
-            raise ValueError(f"Class '{class_name}' not found!")
+    def __init__(self, engine: dspy.LM):
+    #     super().__init__()
+    #     current_module = globals()
+    #     if class_name in current_module:
+    #         cls = current_module.get(class_name)
+    #         self.write_section = dspy.Predict(cls)
+    #     else:
+    #         raise ValueError(f"Class '{class_name}' not found!")
+        self.write_section = dspy.Predict(WriteSection)
         self.engine = engine
 
     def forward(self, topic: str, outline:str, section: str, collected_info: List):

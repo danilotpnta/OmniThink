@@ -4,15 +4,14 @@ import time
 import dspy
 import os
 from openai import OpenAI
-from zhipuai import ZhipuAI
 from typing import Optional, Literal, Any
-from dashscope import Generation
 
+# from dashscope import Generation
 # This code is originally sourced from Repository STORM
 # URL: [https://github.com/stanford-oval/storm]
 
 
-class OpenAIModel_dashscope(dspy.OpenAI):
+class OpenAIModel_dashscope(dspy.LM):
     """A wrapper class for dspy.OpenAI."""
 
     def __init__(
@@ -97,7 +96,7 @@ class OpenAIModel_dashscope(dspy.OpenAI):
                 time.sleep(1)
 
 
-class DeepSeekModel(dspy.OpenAI):
+class DeepSeekModel(dspy.LM):
     """A wrapper class for dspy.OpenAI."""
 
     def __init__(
@@ -145,7 +144,8 @@ class DeepSeekModel(dspy.OpenAI):
         assert return_sorted is False, "for now"
 
         LM_KEY = os.getenv("LM_KEY")
-        client = OpenAI(api_key=LM_KEY, base_url="https://api.deepseek.com")
+        # client = OpenAI(api_key=LM_KEY, base_url="https://api.deepseek.com")
+        client = None
 
         max_retries = 3
         attempt = 0
@@ -181,7 +181,7 @@ class DeepSeekModel(dspy.OpenAI):
         return completions
 
 
-class QwenModel(dspy.OpenAI):
+class QwenModel(dspy.LM):
     """A wrapper class for dspy.OpenAI."""
 
     def __init__(
