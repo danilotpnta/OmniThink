@@ -1,0 +1,250 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 900px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+             #loadingBar {
+                 position:absolute;
+                 top:0px;
+                 left:0px;
+                 width: 100%;
+                 height: 900px;
+                 background-color:rgba(200,200,200,0.8);
+                 -webkit-transition: all 0.5s ease;
+                 -moz-transition: all 0.5s ease;
+                 -ms-transition: all 0.5s ease;
+                 -o-transition: all 0.5s ease;
+                 transition: all 0.5s ease;
+                 opacity:1;
+             }
+
+             #bar {
+                 position:absolute;
+                 top:0px;
+                 left:0px;
+                 width:20px;
+                 height:20px;
+                 margin:auto auto auto auto;
+                 border-radius:11px;
+                 border:2px solid rgba(30,30,30,0.05);
+                 background: rgb(0, 173, 246); /* Old browsers */
+                 box-shadow: 2px 0px 4px rgba(0,0,0,0.4);
+             }
+
+             #border {
+                 position:absolute;
+                 top:10px;
+                 left:10px;
+                 width:500px;
+                 height:23px;
+                 margin:auto auto auto auto;
+                 box-shadow: 0px 0px 4px rgba(0,0,0,0.2);
+                 border-radius:10px;
+             }
+
+             #text {
+                 position:absolute;
+                 top:8px;
+                 left:530px;
+                 width:30px;
+                 height:50px;
+                 margin:auto auto auto auto;
+                 font-size:22px;
+                 color: #000000;
+             }
+
+             div.outerBorder {
+                 position:relative;
+                 top:400px;
+                 width:600px;
+                 height:44px;
+                 margin:auto auto auto auto;
+                 border:8px solid rgba(0,0,0,0.1);
+                 background: rgb(252,252,252); /* Old browsers */
+                 background: -moz-linear-gradient(top,  rgba(252,252,252,1) 0%, rgba(237,237,237,1) 100%); /* FF3.6+ */
+                 background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(252,252,252,1)), color-stop(100%,rgba(237,237,237,1))); /* Chrome,Safari4+ */
+                 background: -webkit-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Chrome10+,Safari5.1+ */
+                 background: -o-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Opera 11.10+ */
+                 background: -ms-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* IE10+ */
+                 background: linear-gradient(to bottom,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* W3C */
+                 filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fcfcfc', endColorstr='#ededed',GradientType=0 ); /* IE6-9 */
+                 border-radius:72px;
+                 box-shadow: 0px 0px 10px rgba(0,0,0,0.2);
+             }
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+            <div id="loadingBar">
+              <div class="outerBorder">
+                <div id="text">0%</div>
+                <div id="border">
+                  <div id="bar"></div>
+                </div>
+              </div>
+            </div>
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "#1f77b4", "id": 1, "label": "Ensemble Learning", "shape": "dot", "title": "Ensemble Learning"}, {"color": "#98df8a", "id": 2, "label": "Model Combination Techniques", "shape": "dot", "title": "Model Combination Techniques"}, {"color": "#8c564b", "id": 3, "label": "Model Optimization Strategies", "shape": "dot", "title": "Model Optimization Strategies"}, {"color": "#c7c7c7", "id": 4, "label": "Model Evaluation Techniques", "shape": "dot", "title": "Model Evaluation Techniques"}, {"color": "#c7c7c7", "id": 5, "label": "Diversity in Ensemble Learning", "shape": "dot", "title": "Diversity in Ensemble Learning"}, {"color": "#c7c7c7", "id": 6, "label": "Ensemble Learning Algorithms", "shape": "dot", "title": "Ensemble Learning Algorithms"}, {"color": "#c7c7c7", "id": 7, "label": "Cross-Validation Methods", "shape": "dot", "title": "Cross-Validation Methods"}, {"color": "#c7c7c7", "id": 8, "label": "High-Dimensional Data Challenges", "shape": "dot", "title": "High-Dimensional Data Challenges"}, {"color": "#8c564b", "id": 9, "label": "Algorithm Diversity", "shape": "dot", "title": "Algorithm Diversity"}, {"color": "#c7c7c7", "id": 10, "label": "Ensemble Learning Techniques", "shape": "dot", "title": "Ensemble Learning Techniques"}, {"color": "#c7c7c7", "id": 11, "label": "Model Combination Strategies", "shape": "dot", "title": "Model Combination Strategies"}, {"color": "#c7c7c7", "id": 12, "label": "Performance Optimization", "shape": "dot", "title": "Performance Optimization"}, {"color": "#c7c7c7", "id": 13, "label": "Deep Learning Innovations", "shape": "dot", "title": "Deep Learning Innovations"}, {"color": "#c7c7c7", "id": 14, "label": "Robustness in Predictions", "shape": "dot", "title": "Robustness in Predictions"}, {"color": "#8c564b", "id": 15, "label": "Data Handling Methods", "shape": "dot", "title": "Data Handling Methods"}, {"color": "#c7c7c7", "id": 16, "label": "Randomization Techniques", "shape": "dot", "title": "Randomization Techniques"}, {"color": "#c7c7c7", "id": 17, "label": "Overfitting Mitigation", "shape": "dot", "title": "Overfitting Mitigation"}, {"color": "#c7c7c7", "id": 18, "label": "Resampling Techniques", "shape": "dot", "title": "Resampling Techniques"}, {"color": "#c7c7c7", "id": 19, "label": "Imbalanced Datasets", "shape": "dot", "title": "Imbalanced Datasets"}, {"color": "#c7c7c7", "id": 20, "label": "Image Resampling", "shape": "dot", "title": "Image Resampling"}, {"color": "#c7c7c7", "id": 21, "label": "Performance Improvement", "shape": "dot", "title": "Performance Improvement"}, {"color": "#8c564b", "id": 22, "label": "Error Correction Approaches", "shape": "dot", "title": "Error Correction Approaches"}, {"color": "#c7c7c7", "id": 23, "label": "Bias-Variance Trade-off Strategies", "shape": "dot", "title": "Bias-Variance Trade-off Strategies"}, {"color": "#c7c7c7", "id": 24, "label": "Biomedical Image Analysis Applications", "shape": "dot", "title": "Biomedical Image Analysis Applications"}, {"color": "#c7c7c7", "id": 25, "label": "Transfer Learning in Medical Fields", "shape": "dot", "title": "Transfer Learning in Medical Fields"}, {"color": "#c7c7c7", "id": 26, "label": "Ensemble Methods in Signal Processing", "shape": "dot", "title": "Ensemble Methods in Signal Processing"}, {"color": "#c7c7c7", "id": 27, "label": "Statistical Foundations of Ensemble Learning", "shape": "dot", "title": "Statistical Foundations of Ensemble Learning"}, {"color": "#8c564b", "id": 28, "label": "Predictive Modeling Frameworks", "shape": "dot", "title": "Predictive Modeling Frameworks"}, {"color": "#c7c7c7", "id": 29, "label": "Model Adaptability", "shape": "dot", "title": "Model Adaptability"}, {"color": "#c7c7c7", "id": 30, "label": "Knowledge Sharing Techniques", "shape": "dot", "title": "Knowledge Sharing Techniques"}, {"color": "#c7c7c7", "id": 31, "label": "Model Complexity and Performance", "shape": "dot", "title": "Model Complexity and Performance"}, {"color": "#c7c7c7", "id": 32, "label": "Optimization Techniques", "shape": "dot", "title": "Optimization Techniques"}, {"color": "#c7c7c7", "id": 33, "label": "Image Processing Innovations", "shape": "dot", "title": "Image Processing Innovations"}, {"color": "#c7c7c7", "id": 34, "label": "Few-Shot Learning", "shape": "dot", "title": "Few-Shot Learning"}, {"color": "#c7c7c7", "id": 35, "label": "Natural Language Processing Enhancements", "shape": "dot", "title": "Natural Language Processing Enhancements"}, {"color": "#c7c7c7", "id": 36, "label": "Ensemble Techniques", "shape": "dot", "title": "Ensemble Techniques"}, {"color": "#8c564b", "id": 37, "label": "Application Domains", "shape": "dot", "title": "Application Domains"}, {"color": "#c7c7c7", "id": 38, "label": "Classification Techniques", "shape": "dot", "title": "Classification Techniques"}, {"color": "#c7c7c7", "id": 39, "label": "Biological Applications", "shape": "dot", "title": "Biological Applications"}, {"color": "#c7c7c7", "id": 40, "label": "Text Classification Framework", "shape": "dot", "title": "Text Classification Framework"}, {"color": "#c7c7c7", "id": 41, "label": "Evaluation Methods", "shape": "dot", "title": "Evaluation Methods"}, {"color": "#c7c7c7", "id": 42, "label": "Recent Innovations", "shape": "dot", "title": "Recent Innovations"}, {"color": "#98df8a", "id": 43, "label": "Performance Improvement Strategies", "shape": "dot", "title": "Performance Improvement Strategies"}, {"color": "#8c564b", "id": 44, "label": "Model Complexity Management", "shape": "dot", "title": "Model Complexity Management"}, {"color": "#c7c7c7", "id": 45, "label": "Regularization Strategies", "shape": "dot", "title": "Regularization Strategies"}, {"color": "#c7c7c7", "id": 46, "label": "Model Performance Metrics", "shape": "dot", "title": "Model Performance Metrics"}, {"color": "#c7c7c7", "id": 47, "label": "Machine Learning Best Practices", "shape": "dot", "title": "Machine Learning Best Practices"}, {"color": "#c7c7c7", "id": 48, "label": "Machine Learning Models", "shape": "dot", "title": "Machine Learning Models"}, {"color": "#c7c7c7", "id": 49, "label": "Validation Strategies", "shape": "dot", "title": "Validation Strategies"}, {"color": "#c7c7c7", "id": 50, "label": "Data Splitting Methods", "shape": "dot", "title": "Data Splitting Methods"}, {"color": "#c7c7c7", "id": 51, "label": "Model Optimization", "shape": "dot", "title": "Model Optimization"}, {"color": "#8c564b", "id": 52, "label": "Ensemble Learning Approaches", "shape": "dot", "title": "Ensemble Learning Approaches"}, {"color": "#c7c7c7", "id": 53, "label": "Error-Correcting Output Codes", "shape": "dot", "title": "Error-Correcting Output Codes"}, {"color": "#c7c7c7", "id": 54, "label": "Pairwise Classification", "shape": "dot", "title": "Pairwise Classification"}, {"color": "#c7c7c7", "id": 55, "label": "Error-Correcting Codes Construction", "shape": "dot", "title": "Error-Correcting Codes Construction"}, {"color": "#c7c7c7", "id": 56, "label": "Bagging Techniques", "shape": "dot", "title": "Bagging Techniques"}, {"color": "#c7c7c7", "id": 57, "label": "Boosting Techniques", "shape": "dot", "title": "Boosting Techniques"}, {"color": "#c7c7c7", "id": 58, "label": "Neighborhood Balanced Bagging", "shape": "dot", "title": "Neighborhood Balanced Bagging"}, {"color": "#8c564b", "id": 59, "label": "Reinforcement Learning Enhancements", "shape": "dot", "title": "Reinforcement Learning Enhancements"}, {"color": "#c7c7c7", "id": 60, "label": "Model Training Techniques", "shape": "dot", "title": "Model Training Techniques"}, {"color": "#c7c7c7", "id": 61, "label": "Loss Function Optimization", "shape": "dot", "title": "Loss Function Optimization"}, {"color": "#c7c7c7", "id": 62, "label": "Gradient Boosting Methods", "shape": "dot", "title": "Gradient Boosting Methods"}, {"color": "#c7c7c7", "id": 63, "label": "Uncertainty Modeling", "shape": "dot", "title": "Uncertainty Modeling"}, {"color": "#c7c7c7", "id": 64, "label": "Probabilistic Techniques", "shape": "dot", "title": "Probabilistic Techniques"}, {"color": "#c7c7c7", "id": 65, "label": "Synthetic Data Challenges", "shape": "dot", "title": "Synthetic Data Challenges"}, {"color": "#c7c7c7", "id": 66, "label": "Bayesian Deep Learning Advances", "shape": "dot", "title": "Bayesian Deep Learning Advances"}, {"color": "#8c564b", "id": 67, "label": "Generalization and Overfitting", "shape": "dot", "title": "Generalization and Overfitting"}, {"color": "#c7c7c7", "id": 68, "label": "Model Evaluation", "shape": "dot", "title": "Model Evaluation"}, {"color": "#c7c7c7", "id": 69, "label": "Regularization Techniques", "shape": "dot", "title": "Regularization Techniques"}, {"color": "#c7c7c7", "id": 70, "label": "Ensemble Methods", "shape": "dot", "title": "Ensemble Methods"}, {"color": "#c7c7c7", "id": 71, "label": "Learning Paradigms", "shape": "dot", "title": "Learning Paradigms"}, {"color": "#c7c7c7", "id": 72, "label": "Data Diversity", "shape": "dot", "title": "Data Diversity"}, {"color": "#98df8a", "id": 73, "label": "Data Representation", "shape": "dot", "title": "Data Representation"}, {"color": "#8c564b", "id": 74, "label": "Data Preprocessing Techniques", "shape": "dot", "title": "Data Preprocessing Techniques"}, {"color": "#c7c7c7", "id": 75, "label": "Data Cleaning", "shape": "dot", "title": "Data Cleaning"}, {"color": "#c7c7c7", "id": 76, "label": "Imbalanced Learning", "shape": "dot", "title": "Imbalanced Learning"}, {"color": "#c7c7c7", "id": 77, "label": "Dimensionality Reduction", "shape": "dot", "title": "Dimensionality Reduction"}, {"color": "#c7c7c7", "id": 78, "label": "Feature Extraction", "shape": "dot", "title": "Feature Extraction"}, {"color": "#c7c7c7", "id": 79, "label": "Impact of IoT and 5G", "shape": "dot", "title": "Impact of IoT and 5G"}, {"color": "#c7c7c7", "id": 80, "label": "Clustering Techniques", "shape": "dot", "title": "Clustering Techniques"}, {"color": "#8c564b", "id": 81, "label": "Feature Engineering", "shape": "dot", "title": "Feature Engineering"}, {"color": "#c7c7c7", "id": 82, "label": "Data Preprocessing", "shape": "dot", "title": "Data Preprocessing"}, {"color": "#c7c7c7", "id": 83, "label": "Feature Extraction Techniques", "shape": "dot", "title": "Feature Extraction Techniques"}, {"color": "#c7c7c7", "id": 84, "label": "Feature Selection Methods", "shape": "dot", "title": "Feature Selection Methods"}, {"color": "#c7c7c7", "id": 85, "label": "Transform Domain Analysis", "shape": "dot", "title": "Transform Domain Analysis"}, {"color": "#c7c7c7", "id": 86, "label": "Compressed Domain Video Analysis", "shape": "dot", "title": "Compressed Domain Video Analysis"}, {"color": "#8c564b", "id": 87, "label": "Machine Learning Paradigms", "shape": "dot", "title": "Machine Learning Paradigms"}, {"color": "#c7c7c7", "id": 88, "label": "Cybersecurity Applications", "shape": "dot", "title": "Cybersecurity Applications"}, {"color": "#c7c7c7", "id": 89, "label": "Data-Driven Techniques", "shape": "dot", "title": "Data-Driven Techniques"}, {"color": "#c7c7c7", "id": 90, "label": "Learning Approaches", "shape": "dot", "title": "Learning Approaches"}, {"color": "#c7c7c7", "id": 91, "label": "Rule Generation and Policy Management", "shape": "dot", "title": "Rule Generation and Policy Management"}, {"color": "#c7c7c7", "id": 92, "label": "Contextual Decision Making", "shape": "dot", "title": "Contextual Decision Making"}, {"color": "#c7c7c7", "id": 93, "label": "Human Feedback Integration", "shape": "dot", "title": "Human Feedback Integration"}, {"color": "#8c564b", "id": 94, "label": "Model Performance Optimization", "shape": "dot", "title": "Model Performance Optimization"}, {"color": "#c7c7c7", "id": 95, "label": "Data Quality Management", "shape": "dot", "title": "Data Quality Management"}, {"color": "#c7c7c7", "id": 96, "label": "Dataset Size and Model Performance", "shape": "dot", "title": "Dataset Size and Model Performance"}, {"color": "#c7c7c7", "id": 97, "label": "Data Transformation Techniques", "shape": "dot", "title": "Data Transformation Techniques"}, {"color": "#c7c7c7", "id": 98, "label": "Handling Imbalanced Datasets", "shape": "dot", "title": "Handling Imbalanced Datasets"}, {"color": "#c7c7c7", "id": 99, "label": "Research and Best Practices", "shape": "dot", "title": "Research and Best Practices"}, {"color": "#8c564b", "id": 100, "label": "Signal Processing Applications", "shape": "dot", "title": "Signal Processing Applications"}, {"color": "#c7c7c7", "id": 101, "label": "Machine Learning Techniques", "shape": "dot", "title": "Machine Learning Techniques"}, {"color": "#c7c7c7", "id": 102, "label": "Pattern Recognition", "shape": "dot", "title": "Pattern Recognition"}, {"color": "#c7c7c7", "id": 103, "label": "Task Prediction", "shape": "dot", "title": "Task Prediction"}, {"color": "#c7c7c7", "id": 104, "label": "Autism Research", "shape": "dot", "title": "Autism Research"}, {"color": "#c7c7c7", "id": 105, "label": "Reinforcement Learning", "shape": "dot", "title": "Reinforcement Learning"}, {"color": "#98df8a", "id": 106, "label": "Classifier Diversity", "shape": "dot", "title": "Classifier Diversity"}, {"color": "#8c564b", "id": 107, "label": "Model Selection", "shape": "dot", "title": "Model Selection"}, {"color": "#c7c7c7", "id": 108, "label": "Hyperparameter Optimization", "shape": "dot", "title": "Hyperparameter Optimization"}, {"color": "#c7c7c7", "id": 109, "label": "Feature Selection", "shape": "dot", "title": "Feature Selection"}, {"color": "#c7c7c7", "id": 110, "label": "Bias-Variance Tradeoff", "shape": "dot", "title": "Bias-Variance Tradeoff"}, {"color": "#c7c7c7", "id": 111, "label": "Predictive Modeling Process", "shape": "dot", "title": "Predictive Modeling Process"}, {"color": "#c7c7c7", "id": 112, "label": "Algorithm Design", "shape": "dot", "title": "Algorithm Design"}, {"color": "#c7c7c7", "id": 113, "label": "Heuristic Methods", "shape": "dot", "title": "Heuristic Methods"}, {"color": "#c7c7c7", "id": 114, "label": "Model Diversity", "shape": "dot", "title": "Model Diversity"}, {"color": "#c7c7c7", "id": 115, "label": "Reinforcement Learning Integration", "shape": "dot", "title": "Reinforcement Learning Integration"}, {"color": "#c7c7c7", "id": 116, "label": "Error Management", "shape": "dot", "title": "Error Management"}, {"color": "#c7c7c7", "id": 117, "label": "Model Selection Strategies", "shape": "dot", "title": "Model Selection Strategies"}, {"color": "#c7c7c7", "id": 118, "label": "Future Directions in ERL", "shape": "dot", "title": "Future Directions in ERL"}, {"color": "#8c564b", "id": 119, "label": "Model Distillation", "shape": "dot", "title": "Model Distillation"}, {"color": "#c7c7c7", "id": 120, "label": "Model Complexity and Regularization", "shape": "dot", "title": "Model Complexity and Regularization"}, {"color": "#c7c7c7", "id": 121, "label": "Knowledge Transfer in Machine Learning", "shape": "dot", "title": "Knowledge Transfer in Machine Learning"}, {"color": "#c7c7c7", "id": 122, "label": "Performance Optimization Strategies", "shape": "dot", "title": "Performance Optimization Strategies"}, {"color": "#c7c7c7", "id": 123, "label": "Adaptability in Learning Models", "shape": "dot", "title": "Adaptability in Learning Models"}, {"color": "#8c564b", "id": 124, "label": "Explainable AI", "shape": "dot", "title": "Explainable AI"}, {"color": "#c7c7c7", "id": 125, "label": "Transparency in ML Models", "shape": "dot", "title": "Transparency in ML Models"}, {"color": "#c7c7c7", "id": 126, "label": "Explainable AI Techniques", "shape": "dot", "title": "Explainable AI Techniques"}, {"color": "#c7c7c7", "id": 127, "label": "Interpretability Challenges", "shape": "dot", "title": "Interpretability Challenges"}, {"color": "#c7c7c7", "id": 128, "label": "Collaboration in Model Development", "shape": "dot", "title": "Collaboration in Model Development"}, {"color": "#c7c7c7", "id": 129, "label": "Strategies for Enhancing Understanding", "shape": "dot", "title": "Strategies for Enhancing Understanding"}, {"color": "#c7c7c7", "id": 130, "label": "Integration of Models", "shape": "dot", "title": "Integration of Models"}, {"color": "#8c564b", "id": 131, "label": "Machine Learning Algorithms", "shape": "dot", "title": "Machine Learning Algorithms"}, {"color": "#c7c7c7", "id": 132, "label": "Support Vector Machines", "shape": "dot", "title": "Support Vector Machines"}, {"color": "#c7c7c7", "id": 133, "label": "Multi-Agent Systems", "shape": "dot", "title": "Multi-Agent Systems"}, {"color": "#c7c7c7", "id": 134, "label": "Computer Vision", "shape": "dot", "title": "Computer Vision"}, {"color": "#c7c7c7", "id": 135, "label": "Deep Learning", "shape": "dot", "title": "Deep Learning"}, {"color": "#c7c7c7", "id": 136, "label": "Neural Networks", "shape": "dot", "title": "Neural Networks"}, {"color": "#c7c7c7", "id": 137, "label": "Advancements in Deep Learning", "shape": "dot", "title": "Advancements in Deep Learning"}, {"color": "#8c564b", "id": 138, "label": "Performance Evaluation", "shape": "dot", "title": "Performance Evaluation"}, {"color": "#c7c7c7", "id": 139, "label": "Model Selection Techniques", "shape": "dot", "title": "Model Selection Techniques"}, {"color": "#c7c7c7", "id": 140, "label": "Performance Metrics", "shape": "dot", "title": "Performance Metrics"}, {"color": "#c7c7c7", "id": 141, "label": "Feature Importance", "shape": "dot", "title": "Feature Importance"}, {"color": "#c7c7c7", "id": 142, "label": "AI Model Design", "shape": "dot", "title": "AI Model Design"}, {"color": "#8c564b", "id": 143, "label": "Model Stability", "shape": "dot", "title": "Model Stability"}, {"color": "#c7c7c7", "id": 144, "label": "Model Performance", "shape": "dot", "title": "Model Performance"}, {"color": "#c7c7c7", "id": 145, "label": "Overfitting Prevention", "shape": "dot", "title": "Overfitting Prevention"}, {"color": "#c7c7c7", "id": 146, "label": "Random Forest Implementation", "shape": "dot", "title": "Random Forest Implementation"}, {"color": "#c7c7c7", "id": 147, "label": "Computational Efficiency", "shape": "dot", "title": "Computational Efficiency"}, {"color": "#c7c7c7", "id": 148, "label": "Heterogeneous Models", "shape": "dot", "title": "Heterogeneous Models"}, {"color": "#8c564b", "id": 149, "label": "Bootstrap Sampling", "shape": "dot", "title": "Bootstrap Sampling"}, {"color": "#c7c7c7", "id": 150, "label": "Data Perturbation Techniques", "shape": "dot", "title": "Data Perturbation Techniques"}, {"color": "#c7c7c7", "id": 151, "label": "Function Perturbation Approaches", "shape": "dot", "title": "Function Perturbation Approaches"}, {"color": "#c7c7c7", "id": 152, "label": "Data Pre-processing in Machine Learning", "shape": "dot", "title": "Data Pre-processing in Machine Learning"}, {"color": "#c7c7c7", "id": 153, "label": "Ensemble Model Strategies", "shape": "dot", "title": "Ensemble Model Strategies"}, {"color": "#c7c7c7", "id": 154, "label": "Generative Models in Deep Learning", "shape": "dot", "title": "Generative Models in Deep Learning"}, {"color": "#c7c7c7", "id": 155, "label": "GL Generative Models Development", "shape": "dot", "title": "GL Generative Models Development"}, {"color": "#8c564b", "id": 156, "label": "Variance Reduction", "shape": "dot", "title": "Variance Reduction"}, {"color": "#c7c7c7", "id": 157, "label": "Model Complexity", "shape": "dot", "title": "Model Complexity"}, {"color": "#c7c7c7", "id": 158, "label": "Urban Data Characteristics", "shape": "dot", "title": "Urban Data Characteristics"}, {"color": "#c7c7c7", "id": 159, "label": "Mitigation Strategies", "shape": "dot", "title": "Mitigation Strategies"}, {"color": "#c7c7c7", "id": 160, "label": "Feature Management", "shape": "dot", "title": "Feature Management"}, {"color": "#c7c7c7", "id": 161, "label": "Bias-Variance Trade-off", "shape": "dot", "title": "Bias-Variance Trade-off"}, {"color": "#c7c7c7", "id": 162, "label": "Data Augmentation", "shape": "dot", "title": "Data Augmentation"}, {"color": "#c7c7c7", "id": 163, "label": "Collaboration in Data Science", "shape": "dot", "title": "Collaboration in Data Science"}, {"color": "#8c564b", "id": 164, "label": "Independent Classifiers", "shape": "dot", "title": "Independent Classifiers"}, {"color": "#c7c7c7", "id": 165, "label": "Parallelization Techniques", "shape": "dot", "title": "Parallelization Techniques"}, {"color": "#c7c7c7", "id": 166, "label": "Deep Learning Architectures", "shape": "dot", "title": "Deep Learning Architectures"}, {"color": "#c7c7c7", "id": 167, "label": "Ensemble Learning Strategies", "shape": "dot", "title": "Ensemble Learning Strategies"}, {"color": "#c7c7c7", "id": 168, "label": "Knowledge Distillation Approaches", "shape": "dot", "title": "Knowledge Distillation Approaches"}, {"color": "#c7c7c7", "id": 169, "label": "Ensemble Model Development", "shape": "dot", "title": "Ensemble Model Development"}, {"color": "#8c564b", "id": 170, "label": "Comparison with Boosting", "shape": "dot", "title": "Comparison with Boosting"}, {"color": "#c7c7c7", "id": 171, "label": "Model Integration", "shape": "dot", "title": "Model Integration"}, {"color": "#c7c7c7", "id": 172, "label": "Sequential Methodologies", "shape": "dot", "title": "Sequential Methodologies"}, {"color": "#c7c7c7", "id": 173, "label": "Recent Advances", "shape": "dot", "title": "Recent Advances"}, {"color": "#c7c7c7", "id": 174, "label": "Feature Complexity", "shape": "dot", "title": "Feature Complexity"}, {"color": "#c7c7c7", "id": 175, "label": "Error-Correcting Codes", "shape": "dot", "title": "Error-Correcting Codes"}, {"color": "#8c564b", "id": 176, "label": "Applications of Bagging", "shape": "dot", "title": "Applications of Bagging"}, {"color": "#c7c7c7", "id": 177, "label": "Image Recognition Techniques", "shape": "dot", "title": "Image Recognition Techniques"}, {"color": "#c7c7c7", "id": 178, "label": "Machine Learning in Image Analysis", "shape": "dot", "title": "Machine Learning in Image Analysis"}, {"color": "#c7c7c7", "id": 179, "label": "Sentiment Analysis Approaches", "shape": "dot", "title": "Sentiment Analysis Approaches"}, {"color": "#c7c7c7", "id": 180, "label": "Financial Forecasting Models", "shape": "dot", "title": "Financial Forecasting Models"}, {"color": "#c7c7c7", "id": 181, "label": "Image Registration in Biomedical Imaging", "shape": "dot", "title": "Image Registration in Biomedical Imaging"}]);
+                  edges = new vis.DataSet([{"arrows": "to", "from": 1, "to": 2}, {"arrows": "to", "from": 2, "to": 3}, {"arrows": "to", "from": 3, "to": 4}, {"arrows": "to", "from": 3, "to": 5}, {"arrows": "to", "from": 3, "to": 6}, {"arrows": "to", "from": 3, "to": 7}, {"arrows": "to", "from": 3, "to": 8}, {"arrows": "to", "from": 2, "to": 9}, {"arrows": "to", "from": 9, "to": 10}, {"arrows": "to", "from": 9, "to": 11}, {"arrows": "to", "from": 9, "to": 12}, {"arrows": "to", "from": 9, "to": 13}, {"arrows": "to", "from": 9, "to": 14}, {"arrows": "to", "from": 2, "to": 15}, {"arrows": "to", "from": 15, "to": 16}, {"arrows": "to", "from": 15, "to": 1}, {"arrows": "to", "from": 15, "to": 17}, {"arrows": "to", "from": 15, "to": 18}, {"arrows": "to", "from": 15, "to": 19}, {"arrows": "to", "from": 15, "to": 20}, {"arrows": "to", "from": 15, "to": 21}, {"arrows": "to", "from": 2, "to": 22}, {"arrows": "to", "from": 22, "to": 4}, {"arrows": "to", "from": 22, "to": 23}, {"arrows": "to", "from": 22, "to": 24}, {"arrows": "to", "from": 22, "to": 25}, {"arrows": "to", "from": 22, "to": 26}, {"arrows": "to", "from": 22, "to": 27}, {"arrows": "to", "from": 2, "to": 28}, {"arrows": "to", "from": 28, "to": 29}, {"arrows": "to", "from": 28, "to": 30}, {"arrows": "to", "from": 28, "to": 31}, {"arrows": "to", "from": 28, "to": 32}, {"arrows": "to", "from": 28, "to": 33}, {"arrows": "to", "from": 28, "to": 34}, {"arrows": "to", "from": 28, "to": 35}, {"arrows": "to", "from": 28, "to": 36}, {"arrows": "to", "from": 2, "to": 37}, {"arrows": "to", "from": 37, "to": 38}, {"arrows": "to", "from": 37, "to": 39}, {"arrows": "to", "from": 37, "to": 40}, {"arrows": "to", "from": 37, "to": 41}, {"arrows": "to", "from": 37, "to": 42}, {"arrows": "to", "from": 1, "to": 43}, {"arrows": "to", "from": 43, "to": 44}, {"arrows": "to", "from": 44, "to": 4}, {"arrows": "to", "from": 44, "to": 45}, {"arrows": "to", "from": 44, "to": 1}, {"arrows": "to", "from": 44, "to": 46}, {"arrows": "to", "from": 44, "to": 47}, {"arrows": "to", "from": 43, "to": 4}, {"arrows": "to", "from": 4, "to": 46}, {"arrows": "to", "from": 4, "to": 38}, {"arrows": "to", "from": 4, "to": 48}, {"arrows": "to", "from": 4, "to": 49}, {"arrows": "to", "from": 4, "to": 50}, {"arrows": "to", "from": 4, "to": 51}, {"arrows": "to", "from": 43, "to": 52}, {"arrows": "to", "from": 52, "to": 53}, {"arrows": "to", "from": 52, "to": 54}, {"arrows": "to", "from": 52, "to": 55}, {"arrows": "to", "from": 52, "to": 56}, {"arrows": "to", "from": 52, "to": 57}, {"arrows": "to", "from": 52, "to": 58}, {"arrows": "to", "from": 43, "to": 59}, {"arrows": "to", "from": 59, "to": 60}, {"arrows": "to", "from": 59, "to": 61}, {"arrows": "to", "from": 59, "to": 62}, {"arrows": "to", "from": 59, "to": 63}, {"arrows": "to", "from": 59, "to": 64}, {"arrows": "to", "from": 59, "to": 65}, {"arrows": "to", "from": 59, "to": 66}, {"arrows": "to", "from": 43, "to": 67}, {"arrows": "to", "from": 67, "to": 68}, {"arrows": "to", "from": 67, "to": 69}, {"arrows": "to", "from": 67, "to": 70}, {"arrows": "to", "from": 67, "to": 71}, {"arrows": "to", "from": 67, "to": 72}, {"arrows": "to", "from": 1, "to": 73}, {"arrows": "to", "from": 73, "to": 74}, {"arrows": "to", "from": 74, "to": 75}, {"arrows": "to", "from": 74, "to": 76}, {"arrows": "to", "from": 74, "to": 77}, {"arrows": "to", "from": 74, "to": 78}, {"arrows": "to", "from": 74, "to": 79}, {"arrows": "to", "from": 74, "to": 80}, {"arrows": "to", "from": 73, "to": 81}, {"arrows": "to", "from": 81, "to": 82}, {"arrows": "to", "from": 81, "to": 83}, {"arrows": "to", "from": 81, "to": 84}, {"arrows": "to", "from": 81, "to": 85}, {"arrows": "to", "from": 81, "to": 86}, {"arrows": "to", "from": 73, "to": 87}, {"arrows": "to", "from": 87, "to": 88}, {"arrows": "to", "from": 87, "to": 89}, {"arrows": "to", "from": 87, "to": 90}, {"arrows": "to", "from": 87, "to": 91}, {"arrows": "to", "from": 87, "to": 92}, {"arrows": "to", "from": 87, "to": 84}, {"arrows": "to", "from": 87, "to": 93}, {"arrows": "to", "from": 73, "to": 94}, {"arrows": "to", "from": 94, "to": 95}, {"arrows": "to", "from": 94, "to": 96}, {"arrows": "to", "from": 94, "to": 97}, {"arrows": "to", "from": 94, "to": 98}, {"arrows": "to", "from": 94, "to": 99}, {"arrows": "to", "from": 73, "to": 100}, {"arrows": "to", "from": 100, "to": 101}, {"arrows": "to", "from": 100, "to": 102}, {"arrows": "to", "from": 100, "to": 103}, {"arrows": "to", "from": 100, "to": 104}, {"arrows": "to", "from": 100, "to": 90}, {"arrows": "to", "from": 100, "to": 105}, {"arrows": "to", "from": 1, "to": 106}, {"arrows": "to", "from": 106, "to": 107}, {"arrows": "to", "from": 107, "to": 68}, {"arrows": "to", "from": 107, "to": 108}, {"arrows": "to", "from": 107, "to": 109}, {"arrows": "to", "from": 107, "to": 110}, {"arrows": "to", "from": 107, "to": 111}, {"arrows": "to", "from": 107, "to": 112}, {"arrows": "to", "from": 107, "to": 113}, {"arrows": "to", "from": 106, "to": 70}, {"arrows": "to", "from": 70, "to": 114}, {"arrows": "to", "from": 70, "to": 115}, {"arrows": "to", "from": 70, "to": 116}, {"arrows": "to", "from": 70, "to": 117}, {"arrows": "to", "from": 70, "to": 118}, {"arrows": "to", "from": 106, "to": 119}, {"arrows": "to", "from": 119, "to": 74}, {"arrows": "to", "from": 119, "to": 120}, {"arrows": "to", "from": 119, "to": 121}, {"arrows": "to", "from": 119, "to": 122}, {"arrows": "to", "from": 119, "to": 123}, {"arrows": "to", "from": 106, "to": 124}, {"arrows": "to", "from": 124, "to": 125}, {"arrows": "to", "from": 124, "to": 126}, {"arrows": "to", "from": 124, "to": 127}, {"arrows": "to", "from": 124, "to": 128}, {"arrows": "to", "from": 124, "to": 129}, {"arrows": "to", "from": 124, "to": 130}, {"arrows": "to", "from": 106, "to": 131}, {"arrows": "to", "from": 131, "to": 132}, {"arrows": "to", "from": 131, "to": 133}, {"arrows": "to", "from": 131, "to": 134}, {"arrows": "to", "from": 131, "to": 135}, {"arrows": "to", "from": 131, "to": 136}, {"arrows": "to", "from": 131, "to": 137}, {"arrows": "to", "from": 106, "to": 138}, {"arrows": "to", "from": 138, "to": 49}, {"arrows": "to", "from": 138, "to": 139}, {"arrows": "to", "from": 138, "to": 140}, {"arrows": "to", "from": 138, "to": 141}, {"arrows": "to", "from": 138, "to": 142}, {"arrows": "to", "from": 1, "to": 6}, {"arrows": "to", "from": 6, "to": 143}, {"arrows": "to", "from": 143, "to": 144}, {"arrows": "to", "from": 143, "to": 145}, {"arrows": "to", "from": 143, "to": 146}, {"arrows": "to", "from": 143, "to": 147}, {"arrows": "to", "from": 143, "to": 148}, {"arrows": "to", "from": 6, "to": 149}, {"arrows": "to", "from": 149, "to": 150}, {"arrows": "to", "from": 149, "to": 151}, {"arrows": "to", "from": 149, "to": 152}, {"arrows": "to", "from": 149, "to": 153}, {"arrows": "to", "from": 149, "to": 154}, {"arrows": "to", "from": 149, "to": 155}, {"arrows": "to", "from": 6, "to": 156}, {"arrows": "to", "from": 156, "to": 157}, {"arrows": "to", "from": 156, "to": 158}, {"arrows": "to", "from": 156, "to": 159}, {"arrows": "to", "from": 156, "to": 160}, {"arrows": "to", "from": 156, "to": 1}, {"arrows": "to", "from": 156, "to": 161}, {"arrows": "to", "from": 156, "to": 162}, {"arrows": "to", "from": 156, "to": 163}, {"arrows": "to", "from": 6, "to": 164}, {"arrows": "to", "from": 164, "to": 165}, {"arrows": "to", "from": 164, "to": 166}, {"arrows": "to", "from": 164, "to": 167}, {"arrows": "to", "from": 164, "to": 168}, {"arrows": "to", "from": 164, "to": 169}, {"arrows": "to", "from": 164, "to": 46}, {"arrows": "to", "from": 6, "to": 170}, {"arrows": "to", "from": 170, "to": 171}, {"arrows": "to", "from": 170, "to": 172}, {"arrows": "to", "from": 170, "to": 173}, {"arrows": "to", "from": 170, "to": 174}, {"arrows": "to", "from": 170, "to": 175}, {"arrows": "to", "from": 6, "to": 176}, {"arrows": "to", "from": 176, "to": 177}, {"arrows": "to", "from": 176, "to": 178}, {"arrows": "to", "from": 176, "to": 179}, {"arrows": "to", "from": 176, "to": 180}, {"arrows": "to", "from": 176, "to": 181}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": false
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+                      network.on("stabilizationProgress", function(params) {
+                          document.getElementById('loadingBar').removeAttribute("style");
+                          var maxWidth = 496;
+                          var minWidth = 20;
+                          var widthFactor = params.iterations/params.total;
+                          var width = Math.max(minWidth,maxWidth * widthFactor);
+                          document.getElementById('bar').style.width = width + 'px';
+                          document.getElementById('text').innerHTML = Math.round(widthFactor*100) + '%';
+                      });
+                      network.once("stabilizationIterationsDone", function() {
+                          document.getElementById('text').innerHTML = '100%';
+                          document.getElementById('bar').style.width = '496px';
+                          document.getElementById('loadingBar').style.opacity = 0;
+                          // really clean the dom element
+                          setTimeout(function () {document.getElementById('loadingBar').style.display = 'none';}, 500);
+                      });
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>

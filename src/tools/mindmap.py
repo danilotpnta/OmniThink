@@ -26,7 +26,7 @@ class ConceptGenerator(dspy.Module):
     def forward(self, infos: List[Dict]):
         snippets_list = []
         for info in infos:
-            snippet = info.get("snippets", [])
+            snippet = info.snippets
             snippets_list.extend(snippet)
 
         snippets_list_str = "\n".join(
@@ -107,30 +107,37 @@ class MindPoint:
     def extend(self):
         extend_concept = dspy.Predict(ExtendConcept)
         with dspy.settings.context(lm=self.lm):
-            info = "\n".join([str(i) for i in self.info])
+            info_str = "\n".join([str(i) for i in self.info])
             keywords = extend_concept(
-                info="\n".join([str(i) for i in self.info]),
+                info=info_str,
                 concept=self.concept,
                 category=self.category,
             ).keywords
         categories = {}
         current_category = None
+
         for line in keywords.split("\n"):
             line = line.strip()
-            if (line.startswith("-[") and line.endswith("]")) or (
-                line.startswith("- [") and line.endswith("]")
-            ):
+            if line.startswith("-[") and line.endswith("]"):
                 current_category = line[2:-1]
                 categories[current_category] = []
-            elif (line.startswith("--{") and current_category) or (
-                line.startswith("-- {") and current_category
-            ):
-                keyword = line[3:-1].strip()
+            elif line.startswith("- [") and line.endswith("]"):
+                current_category = line[3:-1] 
+                categories[current_category] = []
+                
+            elif current_category is not None and line.startswith("--"):
+                if "{" in line and "}" in line:
+                    keyword = line[line.find("{")+1:line.find("}")].strip()
+                else:
+                    keyword = line[2:].strip()
+                    
                 if keyword:
                     categories[current_category].append(keyword)
 
         for category, keywords_list in categories.items():
             new_info = self.retriever(keywords_list)
+            if not new_info:  
+                print(f"Warning: No information retrieved for category: {category}")
             new_concept = self.concept_generator.forward(new_info)
             new_node = MindPoint(
                 concept=new_concept,
@@ -170,26 +177,23 @@ class MindMap:
             category=topic,
         )
         self.root = root
-
         current_level = [root]
 
         for count in range(self.depth):
             next_level = []
-            
             # Yield the current level before processing children.
             yield current_level
-            
             # If it's the last layer, break out of the loop.
             if count == self.depth - 1:
                 break
-            
+
             for node in current_level:
-                node.extend() 
+                node.extend()
                 next_level.extend(node.children.values())
-            
+
             # Optionally, yield the current level after processing (if that's intended).
             yield current_level
-            
+
             # Move to the next level.
             current_level = next_level
 
@@ -223,18 +227,20 @@ class MindMap:
                 "category": node.category,
                 "concept": node.concept,
                 "children": {k: serialize_node(v) for k, v in node.children.items()},
-                "info": node.info,
+                "info": [i.to_dict() for i in node.info],
             }
 
         mind_map_dict = serialize_node(root)
         with open(filename, "w", encoding="utf-8") as f:
-            json.dump(mind_map_dict, f, ensure_ascii=False, indent=2)
+            json.dump(mind_map_dict, f, ensure_ascii=False, indent=4)
 
     def load_map(self, filename: str):
+        from pipeline.apollo.src.core.information import Information
+
         def deserialize_node(node_data):
             category = node_data["category"]
             concept = node_data["concept"]
-            info = node_data["info"]
+            info = [Information.from_dict(i) for i in node_data["info"]]
             children_data = node_data["children"]
 
             node = MindPoint(
@@ -277,7 +283,7 @@ class MindMap:
         def traverse(node: MindPoint):
             if node.info:
                 for info in node.info:
-                    url = info.get("url")
+                    url = info.url
                     if url and url not in seen_urls:
                         seen_urls.add(url)
                         all_infos.append(info)
@@ -301,8 +307,8 @@ class MindMap:
         seen_urls = set()
 
         for info in self.get_all_infos():
-            url = info.get("url")
-            snippets = info.get("snippets", [])
+            url = info.url
+            snippets = info.snippets
             if url and url not in seen_urls:
                 seen_urls.add(url)
                 for snippet in snippets:
@@ -344,7 +350,60 @@ class MindMap:
 
         return result
 
-    def visualize_map(self, root: MindPoint):
+    def visualize_map_pyvis(self, root: MindPoint, output_file="mindmap.html"):
+        """
+        Create an interactive visualization of the mind map using pyvis.
+        """
+        from pyvis.network import Network
+        from matplotlib import cm
+        import matplotlib.colors as mcolors
+
+        # Create the network
+        net = Network(height="900px", width="100%", directed=True, notebook=False)
+
+        node_ids = {}
+        level_colors = {}
+
+        # Generate a color map with up to 20 unique colors
+        max_depth = self.depth + 1
+        cmap = plt.get_cmap("tab20", max_depth)  
+
+        def get_color(level):
+            if level not in level_colors:
+                rgba = cmap(level)
+                hex_color = mcolors.to_hex(rgba)
+                level_colors[level] = hex_color
+            return level_colors[level]
+
+        def add_nodes_edges(node: MindPoint, parent_id=None, level=0):
+            # Assign a unique ID per node category
+            if node.category not in node_ids:
+                node_ids[node.category] = len(node_ids) + 1
+            node_id = node_ids[node.category]
+
+            # Add the node with a color by level
+            net.add_node(
+                node_id,
+                label=node.category,
+                title=node.category,
+                color=get_color(level),
+            )
+
+            if parent_id is not None:
+                net.add_edge(parent_id, node_id)
+
+            for child in node.children.values():
+                add_nodes_edges(child, node_id, level + 1)
+
+        # Build network from root
+        add_nodes_edges(root)
+
+        # Save as interactive HTML
+        net.save_graph(output_file)
+        print(f"Interactive mind map saved to: {output_file}")
+
+
+    def visualize_map(self, root: MindPoint, output_file="mindmap.png"):
         G = nx.DiGraph()
 
         def add_edges(node: MindPoint, parent=None):
@@ -368,4 +427,76 @@ class MindMap:
             arrows=True,
         )
         plt.title("MindMap Visualization", fontsize=15)
-        plt.show()
+        plt.savefig(output_file, dpi=300, bbox_inches="tight")
+        plt.close()
+
+        print(f"Mind map visualization saved to {output_file}")
+
+
+def _setup_retrieval(args):
+    rm = VectorRM(
+        collection_name=args.domain,
+        embedding_model=args.embedding_model,
+        device=args.device,
+        k=args.top_k,
+        seed=args.seed,
+    )
+    rm.set_filter_by(args.topic)
+    rm.k = args.top_k
+
+    return Retriever(rm=rm, max_thread=1)
+
+
+def main(args):
+
+    lm = LLM(
+        model="gpt-4o-mini",
+        temperature=0.1,
+        max_tokens=512,
+        cache=False,
+    )
+
+    retriever = _setup_retrieval(args)
+    # results = retriever("Ensemble learning")
+    # retriever.print_results(results)
+
+    mind_map = MindMap(retriever, lm, depth=args.depth)
+    topic = "Ensemble Learning"
+    levels = list(mind_map.build_map(topic))
+    for i, level in enumerate(levels):
+        print(f"Level {i}: {[node.category for node in level]}")
+
+    if mind_map.root:
+        output_file_png = f"{topic.replace(' ', '_').lower()}_mindmap.png"
+        # mind_map.visualize_map(mind_map.root, output_file_png)
+        output_file_html = f"{topic.replace(' ', '_').lower()}_mindmap.html"
+        mind_map.visualize_map_pyvis(mind_map.root, output_file_html)
+
+        json_file = f"{topic.replace(' ', '_').lower()}_mindmap.json"
+        mind_map.save_map(mind_map.root, json_file)
+        print(f"Mind map data saved to {json_file}")
+
+
+if __name__ == "__main__":
+    import dspy
+    import argparse
+    from pipeline.apollo.src import LLM
+    from pipeline.apollo.src import VectorRM, Retriever
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed",
+    )
+    args, unknown = parser.parse_known_args()
+
+    args.domain = "ComputerScience"
+    args.topic = "Ensemble learning"
+    args.embedding_model = "Snowflake/snowflake-arctic-embed-m-v2.0"
+    args.device = "cuda"
+    args.seed = 42
+    args.top_k = 3
+    args.depth = 4
+    main(args)
