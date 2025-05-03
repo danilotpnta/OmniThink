@@ -15,6 +15,48 @@ from src.utils.ArticleTextProcessing import ArticleTextProcessing
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
+import json
+
+
+def print_duplicate_summary(json_path, pipeline="storm"):
+
+    with open(json_path, "r") as f:
+        data = json.load(f)
+
+    all_urls = []
+
+    if pipeline == "storm":
+        for entry in data:
+            dlg_turns = entry.get("dlg_turns", [])
+            for turn in dlg_turns:
+                search_results = turn.get("search_results", [])
+                for result in search_results:
+                    url = result.get("url")
+                    if url:
+                        all_urls.append(url)
+    elif pipeline == "omnithink":
+
+        def collect_urls(node, all_urls):
+            for info in node.get("info", []):
+                url = info.get("url")
+                if url:
+                    all_urls.append(url)
+
+            for child in node.get("children", {}).values():
+                collect_urls(child, all_urls)
+
+        collect_urls(data, all_urls)
+
+    total_urls = len(all_urls)
+    unique_urls = len(set(all_urls))
+    duplicate_count = total_urls - unique_urls
+    duplicate_pct = (duplicate_count / total_urls) * 100 if total_urls else 0
+
+    print(f"Total URL entries found: {total_urls}")
+    print(f"Unique URLs: {unique_urls}")
+    print(f"Duplicate URLs: {duplicate_count} ({duplicate_pct:.2f}%)")
+
+
 class ConceptGenerator(dspy.Module):
     """Extract information and generate a list of concepts."""
 
@@ -104,7 +146,7 @@ class MindPoint:
         self.retriever = retriever
         self.concept_generator = ConceptGenerator(lm=lm)
 
-    def extend(self):
+    def extend(self, max_categories=3, remaining_budget=None):
         extend_concept = dspy.Predict(ExtendConcept)
         with dspy.settings.context(lm=self.lm):
             info_str = "\n".join([str(i) for i in self.info])
@@ -122,21 +164,179 @@ class MindPoint:
                 current_category = line[2:-1]
                 categories[current_category] = []
             elif line.startswith("- [") and line.endswith("]"):
-                current_category = line[3:-1] 
+                current_category = line[3:-1]
                 categories[current_category] = []
-                
+
             elif current_category is not None and line.startswith("--"):
                 if "{" in line and "}" in line:
-                    keyword = line[line.find("{")+1:line.find("}")].strip()
+                    keyword = line[line.find("{") + 1 : line.find("}")].strip()
                 else:
                     keyword = line[2:].strip()
+
+                if keyword:
+                    categories[current_category].append(keyword)
+
+        # Debug prints
+        print(f"\n{'='*50}")
+        print(f"Extending node: '{self.category}'")
+        print(f"Generated {len(categories)} categories:")
+        for i, (cat, keywords) in enumerate(categories.items()):
+            print(f"  {i+1}. {cat} - {len(keywords)} keywords")
+
+        # Apply limit if specified
+        if max_categories and len(categories) > max_categories:
+            limited_categories = dict(list(categories.items())[:max_categories])
+            print(f"Limited to {max_categories} categories")
+        else:
+            limited_categories = categories
+    
+        total_snippets = 0
+    
+        for category, keywords_list in limited_categories.items():
+            # Check if we have budget before even retrieving
+            if remaining_budget is not None and total_snippets >= remaining_budget:
+                print(f"Budget exhausted ({total_snippets}/{remaining_budget}), stopping")
+                break
+                
+            # Retrieve information
+            new_info = self.retriever(keywords_list)
+            
+            if new_info:
+                snippets_count = sum(len(info.snippets) for info in new_info)
+                
+                # Check if adding these snippets would exceed budget
+                if remaining_budget is not None and total_snippets + snippets_count > remaining_budget:
+                    print(f"Adding {snippets_count} snippets would exceed budget ({total_snippets + snippets_count} > {remaining_budget}), stopping")
+                    break
                     
+                total_snippets += snippets_count
+                
+            # Only create the child if we're within budget
+            new_concept = self.concept_generator.forward(new_info)
+            new_node = MindPoint(
+                concept=new_concept,
+                info=new_info,
+                lm=self.lm,
+                retriever=self.retriever,
+                category=category,
+            )
+            self.children[category] = new_node
+            print(f"  Total snippets for '{category}': {snippets_count}")
+        
+        print(f"Total snippets retrieved for this node: {total_snippets}")
+        return total_snippets
+
+    def extend_debug_claude(self, max_categories=None):
+        extend_concept = dspy.Predict(ExtendConcept)
+        with dspy.settings.context(lm=self.lm):
+            info_str = "\n".join([str(i) for i in self.info])
+            keywords = extend_concept(
+                info=info_str,
+                concept=self.concept,
+                category=self.category,
+            ).keywords
+        categories = {}
+        current_category = None
+
+        for line in keywords.split("\n"):
+            line = line.strip()
+            if line.startswith("-[") and line.endswith("]"):
+                current_category = line[2:-1]
+                categories[current_category] = []
+            elif line.startswith("- [") and line.endswith("]"):
+                current_category = line[3:-1]
+                categories[current_category] = []
+
+            elif current_category is not None and line.startswith("--"):
+                if "{" in line and "}" in line:
+                    keyword = line[line.find("{") + 1 : line.find("}")].strip()
+                else:
+                    keyword = line[2:].strip()
+
+                if keyword:
+                    categories[current_category].append(keyword)
+
+        # Debug prints
+        print(f"\n{'='*50}")
+        print(f"Extending node: '{self.category}'")
+        print(f"Generated {len(categories)} categories:")
+        for i, (cat, keywords) in enumerate(categories.items()):
+            print(f"  {i+1}. {cat} - {len(keywords)} keywords")
+
+        # Apply limit if specified
+        if max_categories and len(categories) > max_categories:
+            limited_categories = dict(list(categories.items())[:max_categories])
+            print(f"Limited to {max_categories} categories")
+        else:
+            limited_categories = categories
+
+        total_snippets = 0
+        for category, keywords_list in limited_categories.items():
+            print(f"  Retrieving for '{category}' with keywords: {keywords_list}")
+            new_info = self.retriever(keywords_list)
+
+            if not new_info:
+                print(f"Warning: No information retrieved for category: {category}")
+            else:
+                # More detailed debugging
+                print(f"  Retrieved {len(new_info)} info objects")
+                snippets_count = 0
+                for i, info in enumerate(new_info):
+                    if hasattr(info, "snippets"):
+                        snippets_count += len(info.snippets)
+                        print(f"    Info {i}: {len(info.snippets)} snippets")
+                    elif isinstance(info, dict) and "snippets" in info:
+                        snippets_count += len(info["snippets"])
+                        print(f"    Info {i}: {len(info['snippets'])} snippets")
+                total_snippets += snippets_count
+                print(f"  Total snippets for '{category}': {snippets_count}")
+
+            new_concept = self.concept_generator.forward(new_info)
+            new_node = MindPoint(
+                concept=new_concept,
+                info=new_info,
+                lm=self.lm,
+                retriever=self.retriever,
+                category=category,
+            )
+            self.children[category] = new_node
+
+        print(f"Total snippets retrieved for this node: {total_snippets}")
+        print(f"{'='*50}\n")
+
+    def extend_(self):
+        extend_concept = dspy.Predict(ExtendConcept)
+        with dspy.settings.context(lm=self.lm):
+            info_str = "\n".join([str(i) for i in self.info])
+            keywords = extend_concept(
+                info=info_str,
+                concept=self.concept,
+                category=self.category,
+            ).keywords
+        categories = {}
+        current_category = None
+
+        for line in keywords.split("\n"):
+            line = line.strip()
+            if line.startswith("-[") and line.endswith("]"):
+                current_category = line[2:-1]
+                categories[current_category] = []
+            elif line.startswith("- [") and line.endswith("]"):
+                current_category = line[3:-1]
+                categories[current_category] = []
+
+            elif current_category is not None and line.startswith("--"):
+                if "{" in line and "}" in line:
+                    keyword = line[line.find("{") + 1 : line.find("}")].strip()
+                else:
+                    keyword = line[2:].strip()
+
                 if keyword:
                     categories[current_category].append(keyword)
 
         for category, keywords_list in categories.items():
             new_info = self.retriever(keywords_list)
-            if not new_info:  
+            if not new_info:
                 print(f"Warning: No information retrieved for category: {category}")
             new_concept = self.concept_generator.forward(new_info)
             new_node = MindPoint(
@@ -165,7 +365,135 @@ class MindMap:
         self.max_workers = workers
         print("MindMap initialized")
 
-    def build_map(self, topic: str):
+    def build_map(self, topic: str, max_total_snippets=135):
+        root_info = self.retriever(topic)
+        root_concept = self.concept_generator(root_info)
+        root = MindPoint(
+            root=True,
+            info=root_info,
+            concept=root_concept,
+            lm=self.gen_concept_lm,
+            retriever=self.retriever,
+            category=topic,
+        )
+        self.root = root
+
+        total_snippets = sum(len(info.snippets) for info in root.info)
+        current_level = [root]
+
+        for count in range(self.depth):
+            yield current_level
+            
+            if count == self.depth - 1 or total_snippets >= max_total_snippets:
+                break
+
+            next_level = []
+            
+            # Process nodes sequentially to maintain precise control
+            for node in current_level:
+                if total_snippets >= max_total_snippets:
+                    print(f"Total limit reached ({total_snippets}), stopping all expansions")
+                    break
+                    
+                remaining_budget = max_total_snippets - total_snippets
+                snippets_added = node.extend(max_categories=args.max_categories, remaining_budget=remaining_budget)
+                total_snippets += snippets_added
+                
+                # Only add children that were actually created
+                next_level.extend(node.children.values())
+
+            current_level = next_level
+            print(f"Level {count + 1} complete. Total snippets: {total_snippets}")
+
+        print(f"Final total snippets: {total_snippets}")
+        
+    def build_map__(self, topic: str, max_total_snippets=180):
+        root_info = self.retriever(topic)
+        root_concept = self.concept_generator(root_info)
+        root = MindPoint(
+            root=True,
+            info=root_info,
+            concept=root_concept,
+            lm=self.gen_concept_lm,
+            retriever=self.retriever,
+            category=topic,
+        )
+        self.root = root
+
+        total_snippets = sum(len(info.snippets) for info in root.info)
+        current_level = [root]
+
+        for count in range(self.depth):
+            yield current_level
+            
+            if count == self.depth - 1 or total_snippets >= max_total_snippets:
+                break
+
+            next_level = []
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                # Calculate remaining budget for each node
+                remaining_budget = max_total_snippets - total_snippets
+                futures = {
+                    executor.submit(node.extend, remaining_budget=remaining_budget): node 
+                    for node in current_level
+                }
+
+                for future in concurrent.futures.as_completed(futures):
+                    node = futures[future]
+                    snippets_added = future.result()
+                    total_snippets += snippets_added
+                    
+                    # Only add children that were actually created
+                    next_level.extend(node.children.values())
+                    
+                    if total_snippets >= max_total_snippets:
+                        print(f"Total limit reached ({total_snippets}), stopping all expansions")
+                        # Cancel remaining futures
+                        for f in futures:
+                            if not f.done():
+                                f.cancel()
+                        break
+
+            current_level = next_level
+            print(f"Level {count + 1} complete. Total snippets: {total_snippets}")
+
+        print(f"Final total snippets: {total_snippets}")
+
+    def build_map_omni(self, topic: str):
+        root_info = self.retriever(topic)
+        root_concept = self.concept_generator(root_info)
+        root = MindPoint(
+            root=True,
+            info=root_info,
+            concept=root_concept,
+            lm=self.gen_concept_lm,
+            retriever=self.retriever,
+            category=topic,
+        )
+        self.root = root
+
+        current_level = [root]
+
+        for count in range(self.depth):
+            next_level = []
+
+            yield current_level
+            if count == self.depth - 1:  # Check if it's the last layer
+                break
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                futures = {executor.submit(node.extend): node for node in current_level}
+
+                for future in concurrent.futures.as_completed(futures):
+                    node = futures[future]
+                    # Assuming extend populates children.
+                    next_level.extend(node.children.values())
+
+            # yield current_level
+            current_level = next_level
+
+    def build_map_(self, topic: str):
         root_info = self.retriever(topic)
         root_concept = self.concept_generator(root_info)
         root = MindPoint(
@@ -366,7 +694,7 @@ class MindMap:
 
         # Generate a color map with up to 20 unique colors
         max_depth = self.depth + 1
-        cmap = plt.get_cmap("tab20", max_depth)  
+        cmap = plt.get_cmap("tab20", max_depth)
 
         def get_color(level):
             if level not in level_colors:
@@ -401,7 +729,6 @@ class MindMap:
         # Save as interactive HTML
         net.save_graph(output_file)
         print(f"Interactive mind map saved to: {output_file}")
-
 
     def visualize_map(self, root: MindPoint, output_file="mindmap.png"):
         G = nx.DiGraph()
@@ -451,7 +778,7 @@ def main(args):
 
     lm = LLM(
         model="gpt-4o-mini",
-        temperature=0.1,
+        temperature=1,
         max_tokens=512,
         cache=False,
     )
@@ -461,20 +788,40 @@ def main(args):
     # retriever.print_results(results)
 
     mind_map = MindMap(retriever, lm, depth=args.depth)
-    topic = "Ensemble Learning"
-    levels = list(mind_map.build_map(topic))
+    topic_name = args.topic.replace(" ", "_")
+
+    levels = list(mind_map.build_map(args.topic), max_total_snippets=args.max_total_snippets)
+
+    # Print level structure
+    print("\nFinal Level Structure:")
     for i, level in enumerate(levels):
-        print(f"Level {i}: {[node.category for node in level]}")
+        print(f"Level {i}: {len(level)} nodes - {[node.category for node in level]}")
+
+    # Count total nodes
+    def count_nodes(node):
+        count = 1
+        for child in node.children.values():
+            count += count_nodes(child)
+        return count
+
+    total_nodes = count_nodes(mind_map.root)
+    print(f"\nTotal nodes in tree: {total_nodes}")
+
+    save_dir = f"{args.output_dir}/{topic_name}"
+    os.makedirs(save_dir, exist_ok=True)
 
     if mind_map.root:
-        output_file_png = f"{topic.replace(' ', '_').lower()}_mindmap.png"
+        # output_file_png = f"{save_dir}/mindmap.png"
         # mind_map.visualize_map(mind_map.root, output_file_png)
-        output_file_html = f"{topic.replace(' ', '_').lower()}_mindmap.html"
+
+        output_file_html = f"{save_dir}/mindmap_d{args.depth}_top_{args.top_k}.html"
         mind_map.visualize_map_pyvis(mind_map.root, output_file_html)
 
-        json_file = f"{topic.replace(' ', '_').lower()}_mindmap.json"
+        json_file = f"{save_dir}/mindmap_d{args.depth}_top_{args.top_k}.json"
         mind_map.save_map(mind_map.root, json_file)
         print(f"Mind map data saved to {json_file}")
+
+        print_duplicate_summary(json_file, pipeline="omnithink")
 
 
 if __name__ == "__main__":
@@ -484,19 +831,22 @@ if __name__ == "__main__":
     from pipeline.apollo.src import VectorRM, Retriever
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed",
-    )
+    parser.add_argument("--seed", default=42)
     args, unknown = parser.parse_known_args()
+    args.output_dir = (
+        "/home/toapantabarahonad/ds-agentic-topic-pages-gen/pipeline/omnithink/tmp"
+    )
 
     args.domain = "ComputerScience"
-    args.topic = "Ensemble learning"
+    # args.topic = "Ensemble learning"
+    args.topic = "Linear discriminant analysis"
+    # args.topic = "Network time protocol"
+
     args.embedding_model = "Snowflake/snowflake-arctic-embed-m-v2.0"
     args.device = "cuda"
     args.seed = 42
-    args.top_k = 3
-    args.depth = 4
+    args.top_k = 5
+    args.depth = 3
+    args.max_categories = 3
+    args.max_total_snippets = 135
     main(args)
