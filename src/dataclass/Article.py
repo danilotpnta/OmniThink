@@ -1,9 +1,9 @@
 import copy
 import re
 from typing import Optional, List, Dict
-from src.dataclass.interface import articleSectionNode, article
-from src.utils.ArticleTextProcessing import ArticleTextProcessing
-from src.utils.FileIOHelper import FileIOHelper
+from .interface import articleSectionNode, article
+from ..utils.ArticleTextProcessing import ArticleTextProcessing
+from ..utils.FileIOHelper import FileIOHelper
 
 # This code is originally sourced from Repository STORM
 # URL: [https://github.com/stanford-oval/storm]

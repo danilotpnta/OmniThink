@@ -1,6 +1,6 @@
 import copy
 import dspy
-from src.utils.ArticleTextProcessing import ArticleTextProcessing
+from ..utils.ArticleTextProcessing import ArticleTextProcessing
 
 
 # This code is originally sourced from Repository STORM

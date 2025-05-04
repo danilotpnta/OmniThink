@@ -7,7 +7,7 @@ from typing import List, Union
 import random
 import dspy
 import sys
-from src.utils.ArticleTextProcessing import ArticleTextProcessing
+from ..utils.ArticleTextProcessing import ArticleTextProcessing
 
 
 # This code is originally sourced from Repository STORM

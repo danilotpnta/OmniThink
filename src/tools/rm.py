@@ -8,7 +8,7 @@ import uuid
 import json
 import random
 import time
-from src.utils.WebPageHelper import WebPageHelper
+from ..utils.WebPageHelper import WebPageHelper
 
 
 def clean_text(res):

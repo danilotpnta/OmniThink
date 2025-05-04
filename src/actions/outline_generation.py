@@ -1,6 +1,6 @@
 import dspy
-from src.tools.mindmap import MindMap
-from src.utils.ArticleTextProcessing import ArticleTextProcessing
+from ..tools.mindmap import MindMap
+from ..utils.ArticleTextProcessing import ArticleTextProcessing
 
 # This code is originally sourced from Repository STORM
 # URL: [https://github.com/stanford-oval/storm]
