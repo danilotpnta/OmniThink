@@ -639,7 +639,7 @@ def mk_mindmap(args, lm, retriever):
         if args.debugging:
             print(f"\nTotal nodes in tree: {total_nodes}")
 
-    save_dir = f"{args.output_dir}/{args.domain}/{topic_name}"
+    save_dir = f"{args.output_dir}/{args.domain}/{topic_name}/{args.jobid or ''}"
     os.makedirs(save_dir, exist_ok=True)
 
     if mind_map.root:
@@ -653,8 +653,8 @@ def mk_mindmap(args, lm, retriever):
         result = eval_duplicate_sources(json_file, pipeline="omnithink")
 
         return result
-    
-    
+
+
 def _setup_retrieval(args):
     rm = VectorRM(
         collection_name=args.domain,
@@ -668,6 +668,7 @@ def _setup_retrieval(args):
 
     return Retriever(rm=rm, max_thread=1)
 
+
 def main(args):
 
     all_results = []
@@ -679,14 +680,14 @@ def main(args):
         max_tokens=512,
         cache=False,
     )
-    
+
     retriever = _setup_retrieval(args)
 
     for i, (domain, topics) in enumerate(tqdm(domains.items(), desc="Domain")):
         logger.info(f"\n** Domain: {domain} **")
 
         retriever.rm.collection_name = domain
-        retriever.rm.init_docker_qdrant() 
+        retriever.rm.init_docker_qdrant()
 
         for topic in tqdm(topics, desc="Generating articles"):
             topic_name = topic.replace(" ", "_")
@@ -731,12 +732,12 @@ def main(args):
         # write per-topic and summary to disk
         out_summary_path = os.path.join(
             args.result_output_dir,
-            args.run_to_evaluate,
+            args.jobid or "",
             "summary.json",
         )
         out_details_path = os.path.join(
             args.result_output_dir,
-            args.run_to_evaluate,
+            args.jobid or "",
             "per_topic.json",
         )
         dump_json(summary, out_summary_path)
@@ -747,6 +748,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--jobid",
+        required=False,
+    )
     args, unknown = parser.parse_known_args()
     args.seed = 42
     args.device = "cuda"
@@ -766,6 +771,6 @@ if __name__ == "__main__":
     args.top_k = 5
     args.depth = 3
     args.max_categories = 3
-    args.max_total_snippets = 135 # This is a cap in theory it will always be below this threshold but added as safeguard
+    args.max_total_snippets = 135  # This is a cap in theory it will always be below this threshold but added as safeguard
     args.debugging = False
     main(args)
