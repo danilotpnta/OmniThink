@@ -1,24 +1,36 @@
-import concurrent.futures
 import os
 import re
 import json
 import dspy
 import numpy as np
-import networkx as nx
+from tqdm import tqdm
+import concurrent.futures
 import matplotlib.pyplot as plt
 from typing import Union, List, Optional, Dict
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from src.utils.ArticleTextProcessing import ArticleTextProcessing
+from pipeline.omnithink.src.utils.ArticleTextProcessing import ArticleTextProcessing
+
+import sys
+
+sys.path.append("/home/toapantabarahonad/ds-agentic-topic-pages-gen")
+
+import argparse
+from pipeline.apollo.src import LLM
+from pipeline.apollo.src import VectorRM, Retriever
+from src.utils import (
+    load_domains,
+    format_args,
+    setup_logging,
+    get_logger,
+    dump_json,
+)
+
+setup_logging()
+logger = get_logger(__name__)
 
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
-
-import json
-
-
-def print_duplicate_summary(json_path, pipeline="storm"):
+def eval_duplicate_sources(json_path, pipeline="storm"):
 
     with open(json_path, "r") as f:
         data = json.load(f)
@@ -55,6 +67,13 @@ def print_duplicate_summary(json_path, pipeline="storm"):
     print(f"Total URL entries found: {total_urls}")
     print(f"Unique URLs: {unique_urls}")
     print(f"Duplicate URLs: {duplicate_count} ({duplicate_pct:.2f}%)")
+
+    return {
+        "total_urls": total_urls,
+        "unique_urls": unique_urls,
+        "duplicate_count": duplicate_count,
+        "duplicate_pct": duplicate_pct,
+    }
 
 
 class ConceptGenerator(dspy.Module):
@@ -146,7 +165,7 @@ class MindPoint:
         self.retriever = retriever
         self.concept_generator = ConceptGenerator(lm=lm)
 
-    def extend(self, max_categories=3, remaining_budget=None):
+    def extend(self, max_categories=3, remaining_budget=None, debugging=False):
         extend_concept = dspy.Predict(ExtendConcept)
         with dspy.settings.context(lm=self.lm):
             info_str = "\n".join([str(i) for i in self.info])
@@ -176,41 +195,51 @@ class MindPoint:
                 if keyword:
                     categories[current_category].append(keyword)
 
-        # Debug prints
-        print(f"\n{'='*50}")
-        print(f"Extending node: '{self.category}'")
-        print(f"Generated {len(categories)} categories:")
-        for i, (cat, keywords) in enumerate(categories.items()):
-            print(f"  {i+1}. {cat} - {len(keywords)} keywords")
+        if debugging:
+            print(f"\n{'='*50}")
+            print(f"Extending node: '{self.category}'")
+            print(f"Generated {len(categories)} categories:")
+            for i, (cat, keywords) in enumerate(categories.items()):
+                print(f"  {i+1}. {cat} - {len(keywords)} keywords")
 
         # Apply limit if specified
         if max_categories and len(categories) > max_categories:
             limited_categories = dict(list(categories.items())[:max_categories])
-            print(f"Limited to {max_categories} categories")
+            if debugging:
+                print(f"Limited to {max_categories} categories")
         else:
             limited_categories = categories
-    
+
         total_snippets = 0
-    
+
         for category, keywords_list in limited_categories.items():
             # Check if we have budget before even retrieving
             if remaining_budget is not None and total_snippets >= remaining_budget:
-                print(f"Budget exhausted ({total_snippets}/{remaining_budget}), stopping")
+                if debugging:
+                    print(
+                        f"Budget exhausted ({total_snippets}/{remaining_budget}), stopping"
+                    )
                 break
-                
+
             # Retrieve information
             new_info = self.retriever(keywords_list)
-            
+
             if new_info:
                 snippets_count = sum(len(info.snippets) for info in new_info)
-                
+
                 # Check if adding these snippets would exceed budget
-                if remaining_budget is not None and total_snippets + snippets_count > remaining_budget:
-                    print(f"Adding {snippets_count} snippets would exceed budget ({total_snippets + snippets_count} > {remaining_budget}), stopping")
+                if (
+                    remaining_budget is not None
+                    and total_snippets + snippets_count > remaining_budget
+                ):
+                    if debugging:
+                        print(
+                            f"Adding {snippets_count} snippets would exceed budget ({total_snippets + snippets_count} > {remaining_budget}), stopping"
+                        )
                     break
-                    
+
                 total_snippets += snippets_count
-                
+
             # Only create the child if we're within budget
             new_concept = self.concept_generator.forward(new_info)
             new_node = MindPoint(
@@ -221,11 +250,12 @@ class MindPoint:
                 category=category,
             )
             self.children[category] = new_node
-            print(f"  Total snippets for '{category}': {snippets_count}")
-        
-        print(f"Total snippets retrieved for this node: {total_snippets}")
-        return total_snippets
+            if debugging:
+                print(f"  Total snippets for '{category}': {snippets_count}")
 
+        if debugging:
+            print(f"Total snippets retrieved for this node: {total_snippets}")
+        return total_snippets
 
 
 class MindMap:
@@ -234,6 +264,7 @@ class MindMap:
         retriever,
         gen_concept_lm: dspy.LM,
         depth: int,
+        max_categories,
         workers: int = 5,
     ):
         self.retriever = retriever
@@ -242,9 +273,10 @@ class MindMap:
         self.concept_generator = ConceptGenerator(lm=self.gen_concept_lm)
         self.root = None
         self.max_workers = workers
+        self.max_categories = max_categories
         print("MindMap initialized")
 
-    def build_map(self, topic: str, max_total_snippets=135):
+    def build_map(self, topic: str, max_total_snippets=135, debugging=False):
         root_info = self.retriever(topic)
         root_concept = self.concept_generator(root_info)
         root = MindPoint(
@@ -262,30 +294,119 @@ class MindMap:
 
         for count in range(self.depth):
             yield current_level
-            
+
             if count == self.depth - 1 or total_snippets >= max_total_snippets:
                 break
 
             next_level = []
-            
+
+            # Use a thread-safe counter
+            import threading
+
+            snippets_lock = threading.Lock()
+
+            def process_node(node):
+                nonlocal total_snippets
+
+                # Check if we should continue
+                with snippets_lock:
+                    if total_snippets >= max_total_snippets:
+                        return 0, []
+                    remaining_budget = max_total_snippets - total_snippets
+
+                # Extend the node
+                snippets_added = node.extend(
+                    max_categories=self.max_categories,
+                    remaining_budget=remaining_budget,
+                    debugging=debugging,
+                )
+
+                # Update total count thread-safely
+                with snippets_lock:
+                    total_snippets += snippets_added
+
+                return snippets_added, list(node.children.values())
+
+            # Process all nodes in parallel
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                futures = [
+                    executor.submit(process_node, node) for node in current_level
+                ]
+
+                for future in concurrent.futures.as_completed(futures):
+                    snippets_added, children = future.result()
+                    if children:
+                        next_level.extend(children)
+
+                    # Check if we've hit the limit
+                    with snippets_lock:
+                        if total_snippets >= max_total_snippets:
+                            if debugging:
+                                print(
+                                    f"Total limit reached ({total_snippets}), cancelling remaining tasks"
+                                )
+
+                            for f in futures:
+                                if not f.done():
+                                    f.cancel()
+                            break
+
+            current_level = next_level
+            if debugging:
+                print(f"Level {count + 1} complete. Total snippets: {total_snippets}")
+        if debugging:
+            print(f"Final total snippets: {total_snippets}")
+
+    def build_map_works(self, topic: str, max_total_snippets=135, debugging=False):
+        root_info = self.retriever(topic)
+        root_concept = self.concept_generator(root_info)
+        root = MindPoint(
+            root=True,
+            info=root_info,
+            concept=root_concept,
+            lm=self.gen_concept_lm,
+            retriever=self.retriever,
+            category=topic,
+        )
+        self.root = root
+
+        total_snippets = sum(len(info.snippets) for info in root.info)
+        current_level = [root]
+
+        for count in range(self.depth):
+            yield current_level
+
+            if count == self.depth - 1 or total_snippets >= max_total_snippets:
+                break
+
+            next_level = []
+
             # Process nodes sequentially to maintain precise control
             for node in current_level:
                 if total_snippets >= max_total_snippets:
-                    print(f"Total limit reached ({total_snippets}), stopping all expansions")
+                    if debugging:
+                        print(
+                            f"Total limit reached ({total_snippets}), stopping all expansions"
+                        )
                     break
-                    
+
                 remaining_budget = max_total_snippets - total_snippets
-                snippets_added = node.extend(max_categories=args.max_categories, remaining_budget=remaining_budget)
+                snippets_added = node.extend(
+                    max_categories=args.max_categories,
+                    remaining_budget=remaining_budget,
+                )
                 total_snippets += snippets_added
-                
+
                 # Only add children that were actually created
                 next_level.extend(node.children.values())
 
             current_level = next_level
-            print(f"Level {count + 1} complete. Total snippets: {total_snippets}")
+            if debugging:
+                print(f"Level {count + 1} complete. Total snippets: {total_snippets}")
 
-        print(f"Final total snippets: {total_snippets}")
-        
+        if debugging:
+            print(f"Final total snippets: {total_snippets}")
+
     def recursive_extend(self, node: MindPoint, count: int):
         if count >= self.depth:
             return
@@ -473,36 +594,67 @@ class MindMap:
         net.save_graph(output_file)
         print(f"Interactive mind map saved to: {output_file}")
 
-    def visualize_map(self, root: MindPoint, output_file="mindmap.png"):
-        G = nx.DiGraph()
 
-        def add_edges(node: MindPoint, parent=None):
-            if parent is not None:
-                G.add_edge(parent, node.category)
-            for child in node.children.values():
-                add_edges(child, node.category)
+def mk_mindmap(args, lm, retriever):
 
-        add_edges(root)
+    # lm = LLM(
+    #     model="gpt-4o-mini",
+    #     temperature=1,
+    #     max_tokens=512,
+    #     cache=False,
+    # )
 
-        plt.figure(figsize=(12, 8))
-        pos = nx.spring_layout(G)
-        nx.draw(
-            G,
-            pos,
-            with_labels=True,
-            node_size=3000,
-            node_color="skyblue",
-            font_size=10,
-            font_weight="bold",
-            arrows=True,
+    # retriever = _setup_retrieval(args)
+    # # results = retriever("Ensemble learning")
+    # # retriever.print_results(results)
+
+    mind_map = MindMap(
+        retriever, lm, depth=args.depth, max_categories=args.max_categories
+    )
+    topic_name = args.topic.replace(" ", "_")
+
+    levels = list(
+        mind_map.build_map(
+            args.topic,
+            max_total_snippets=args.max_total_snippets,
+            debugging=args.debugging,
         )
-        plt.title("MindMap Visualization", fontsize=15)
-        plt.savefig(output_file, dpi=300, bbox_inches="tight")
-        plt.close()
+    )
 
-        print(f"Mind map visualization saved to {output_file}")
+    if args.debugging:
+        print("\nFinal Level Structure:")
+        for i, level in enumerate(levels):
+            print(
+                f"Level {i}: {len(level)} nodes - {[node.category for node in level]}"
+            )
 
+        def count_nodes(node):
+            count = 1
+            for child in node.children.values():
+                count += count_nodes(child)
+            return count
 
+        total_nodes = count_nodes(mind_map.root)
+
+        if args.debugging:
+            print(f"\nTotal nodes in tree: {total_nodes}")
+
+    save_dir = f"{args.output_dir}/{args.domain}/{topic_name}"
+    os.makedirs(save_dir, exist_ok=True)
+
+    if mind_map.root:
+        output_file_html = f"{save_dir}/mindmap_d{args.depth}_top_{args.top_k}.html"
+        mind_map.visualize_map_pyvis(mind_map.root, output_file_html)
+
+        json_file = f"{save_dir}/mindmap_d{args.depth}_top_{args.top_k}.json"
+        mind_map.save_map(mind_map.root, json_file)
+        print(f"Mind map data saved to {json_file}")
+
+        result = eval_duplicate_sources(json_file, pipeline="omnithink")
+
+        return result
+    
+    
 def _setup_retrieval(args):
     rm = VectorRM(
         collection_name=args.domain,
@@ -516,8 +668,10 @@ def _setup_retrieval(args):
 
     return Retriever(rm=rm, max_thread=1)
 
-
 def main(args):
+
+    all_results = []
+    domains: dict = load_domains()
 
     lm = LLM(
         model="gpt-4o-mini",
@@ -525,71 +679,93 @@ def main(args):
         max_tokens=512,
         cache=False,
     )
-
+    
     retriever = _setup_retrieval(args)
-    # results = retriever("Ensemble learning")
-    # retriever.print_results(results)
 
-    mind_map = MindMap(retriever, lm, depth=args.depth)
-    topic_name = args.topic.replace(" ", "_")
+    for i, (domain, topics) in enumerate(tqdm(domains.items(), desc="Domain")):
+        logger.info(f"\n** Domain: {domain} **")
 
-    levels = list(mind_map.build_map(args.topic), max_total_snippets=args.max_total_snippets)
+        retriever.rm.collection_name = domain
+        retriever.rm.init_docker_qdrant() 
 
-    # Print level structure
-    print("\nFinal Level Structure:")
-    for i, level in enumerate(levels):
-        print(f"Level {i}: {len(level)} nodes - {[node.category for node in level]}")
+        for topic in tqdm(topics, desc="Generating articles"):
+            topic_name = topic.replace(" ", "_")
 
-    # Count total nodes
-    def count_nodes(node):
-        count = 1
-        for child in node.children.values():
-            count += count_nodes(child)
-        return count
+            print(f"\n=== Topic: {topic_name} ===")
 
-    total_nodes = count_nodes(mind_map.root)
-    print(f"\nTotal nodes in tree: {total_nodes}")
+            args.topic = topic
+            args.domain = domain
 
-    save_dir = f"{args.output_dir}/{topic_name}"
-    os.makedirs(save_dir, exist_ok=True)
+            retriever.rm.set_filter_by(topic)
 
-    if mind_map.root:
-        # output_file_png = f"{save_dir}/mindmap.png"
-        # mind_map.visualize_map(mind_map.root, output_file_png)
+            try:
+                result = mk_mindmap(args, lm, retriever)
+                result.update(
+                    {
+                        "domain": domain,
+                        "topic": topic_name,
+                    }
+                )
+                all_results.append(result)
+            except Exception as e:
+                print(f"Error processing {topic_name}: {e}")
+                continue
 
-        output_file_html = f"{save_dir}/mindmap_d{args.depth}_top_{args.top_k}.html"
-        mind_map.visualize_map_pyvis(mind_map.root, output_file_html)
+        retriever.rm.cleanup()
 
-        json_file = f"{save_dir}/mindmap_d{args.depth}_top_{args.top_k}.json"
-        mind_map.save_map(mind_map.root, json_file)
-        print(f"Mind map data saved to {json_file}")
+    if all_results:
+        total_urls = sum(r["total_urls"] for r in all_results)
+        unique_urls = sum(r["unique_urls"] for r in all_results)
+        duplicate_count = sum(r["duplicate_count"] for r in all_results)
+        overall_dup_pct = (duplicate_count / total_urls) * 100 if total_urls else 0
 
-        print_duplicate_summary(json_file, pipeline="omnithink")
+        summary = {
+            "pipeline": args.pipeline,
+            "num_topics": len(all_results),
+            "total_urls": total_urls,
+            "unique_urls": unique_urls,
+            "duplicate_count": duplicate_count,
+            "overall_duplicate_pct": overall_dup_pct,
+        }
+
+        # write per-topic and summary to disk
+        out_summary_path = os.path.join(
+            args.result_output_dir,
+            args.run_to_evaluate,
+            "summary.json",
+        )
+        out_details_path = os.path.join(
+            args.result_output_dir,
+            args.run_to_evaluate,
+            "per_topic.json",
+        )
+        dump_json(summary, out_summary_path)
+        dump_json(all_results, out_details_path)
+
+        print(f"\nOverall summary results: {out_summary_path}")
 
 
 if __name__ == "__main__":
-    import dspy
-    import argparse
-    from pipeline.apollo.src import LLM
-    from pipeline.apollo.src import VectorRM, Retriever
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", default=42)
     args, unknown = parser.parse_known_args()
-    args.output_dir = (
-        "/home/toapantabarahonad/ds-agentic-topic-pages-gen/pipeline/omnithink/tmp"
-    )
+    args.seed = 42
+    args.device = "cuda"
+    args.embedding_model = "Snowflake/snowflake-arctic-embed-m-v2.0"
+    args.output_dir = "/home/toapantabarahonad/ds-agentic-topic-pages-gen/output/omnithink/gen_articles/SciWiki-100"
+    args.result_output_dir = "/home/toapantabarahonad/ds-agentic-topic-pages-gen/output/omnithink/metrics/sources_eval_results/"
+    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.result_output_dir, exist_ok=True)
 
     args.domain = "ComputerScience"
+
     # args.topic = "Ensemble learning"
     args.topic = "Linear discriminant analysis"
     # args.topic = "Network time protocol"
 
-    args.embedding_model = "Snowflake/snowflake-arctic-embed-m-v2.0"
-    args.device = "cuda"
-    args.seed = 42
+    args.pipeline = "omnithink"
     args.top_k = 5
     args.depth = 3
     args.max_categories = 3
-    args.max_total_snippets = 135
+    args.max_total_snippets = 135 # This is a cap in theory it will always be below this threshold but added as safeguard
+    args.debugging = False
     main(args)
