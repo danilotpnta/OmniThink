@@ -1,7 +1,8 @@
 import copy
 import dspy
+import os
 from ..utils.ArticleTextProcessing import ArticleTextProcessing
-
+from ..dataclass.Article import Article
 
 # This code is originally sourced from Repository STORM
 # URL: [https://github.com/stanford-oval/storm]
@@ -23,7 +24,13 @@ class ArticlePolishingModule:
             write_lead_engine=self.article_gen_lm, polish_engine=self.article_polish_lm
         )
 
-    def polish_article(self, topic: str, draft_article, remove_duplicate: bool = False):
+    def polish_article(
+        self,
+        topic: str,
+        draft_article,
+        remove_duplicate: bool = False,
+        save_dir: str = None,
+    ):
         """
         Polish article.
 
@@ -32,6 +39,8 @@ class ArticlePolishingModule:
             draft_article (StormArticle): The draft article.
             remove_duplicate (bool): Whether to use one additional LM call to remove duplicates from the article.
         """
+        # if not remove_duplicate:
+        #     return draft_article
 
         article_text = draft_article.to_string()
         remove_duplicate = True
@@ -44,9 +53,24 @@ class ArticlePolishingModule:
         polished_article_dict = ArticleTextProcessing.parse_article_into_dict(
             polished_article
         )
-        polished_article = copy.deepcopy(draft_article)
+        polished_article: Article = copy.deepcopy(draft_article)
         polished_article.insert_or_create_section(article_dict=polished_article_dict)
         polished_article.post_processing()
+
+        # Save Polished Article
+        article_polished_path = os.path.join(
+            save_dir,
+            f"omnithink_gen_article_polished.md",
+        )
+
+        # Save References
+        article_references_path = os.path.join(
+            save_dir,
+            f"url_to_info_polished.json",
+        )
+        polished_article.dump_reference_to_file(article_references_path)
+        polished_article.dump_article_as_plain_text(article_polished_path)
+
         return polished_article
 
 

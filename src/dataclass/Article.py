@@ -347,13 +347,24 @@ class Article(article):
         FileIOHelper.write_str("\n".join(outline), file_path)
 
     def dump_reference_to_file(self, file_path):
-        reference = copy.deepcopy(self.reference)
-        for url in reference["url_to_info"]:
-            reference["url_to_info"][url] = reference["url_to_info"][url].to_dict()
-        FileIOHelper.dump_json(reference, file_path)
-
+        # reference = copy.deepcopy(self.reference)
+        # for url in reference["url_to_info"]:
+        #     reference["url_to_info"][url] = reference["url_to_info"][url].to_dict()
+        
+        self.reference_ = copy.deepcopy(self.reference)
+        for url, info in self.reference_["url_to_info"].items():
+            self.reference_["url_to_info"][url] = (
+                info.to_dict() if hasattr(info, "to_dict") else info
+            )
+        FileIOHelper.dump_json(self.reference_, file_path)
+    
     def dump_article_as_plain_text(self, file_path):
         text = self.to_string()
+        references_str = ArticleTextProcessing.construct_bibliography_from_url_to_info(
+            self.reference_
+        )
+        # print(references_str)
+        text += references_str
         FileIOHelper.write_str(text, file_path)
 
     def post_processing(self):

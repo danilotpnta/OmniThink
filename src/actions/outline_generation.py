@@ -1,3 +1,4 @@
+import os
 import dspy
 from ..tools.mindmap import MindMap
 from ..utils.ArticleTextProcessing import ArticleTextProcessing
@@ -17,12 +18,20 @@ class OutlineGenerationModule:
         self,
         topic: str,
         mindmap: MindMap,
+        save_dir: str = None,
     ):
 
         concepts = mindmap.export_categories_and_concepts()
-        result = self.write_outline(topic=topic, concepts=concepts)
+        outline = self.write_outline(topic=topic, concepts=concepts)
 
-        return result
+        outline_path = os.path.join(
+            save_dir,
+            f"omnithink_gen_outline.md",
+        )
+        with open(outline_path, "w", encoding="utf-8") as file:
+            file.write(outline)
+
+        return outline
 
 
 class WriteOutline(dspy.Module):
