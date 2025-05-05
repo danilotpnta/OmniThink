@@ -5,13 +5,19 @@ import httpx
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from trafilatura import extract
 
+
 class WebPageHelper:
     """Helper class to process web pages.
 
     Acknowledgement: Part of the code is adapted from https://github.com/stanford-oval/WikiChat project.
     """
 
-    def __init__(self, min_char_count: int = 150, snippet_chunk_size: int = 1000, max_thread_num: int = 10):
+    def __init__(
+        self,
+        min_char_count: int = 150,
+        snippet_chunk_size: int = 1000,
+        max_thread_num: int = 10,
+    ):
         """
         Args:
             min_char_count: Minimum character count for the article to be considered valid.
@@ -36,7 +42,7 @@ class WebPageHelper:
                 "\uff0c",  # Fullwidth comma
                 "\u3001",  # Ideographic comma
                 " ",
-                "\u200B",  # Zero-width space
+                "\u200b",  # Zero-width space
                 "",
             ],
         )
@@ -52,7 +58,9 @@ class WebPageHelper:
             return None
 
     def urls_to_articles(self, urls: List[str]) -> Dict:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_thread_num) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_thread_num
+        ) as executor:
             htmls = list(executor.map(self.download_webpage, urls))
 
         articles = {}
