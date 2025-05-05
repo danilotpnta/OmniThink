@@ -12,17 +12,29 @@ from ..utils.WebPageHelper import WebPageHelper
 
 
 def clean_text(res):
-    pattern = r'\[.*?\]\(.*?\)'
-    result = re.sub(pattern, '', res)
-    url_pattern = pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
-    result = re.sub(url_pattern, '', result)
+    pattern = r"\[.*?\]\(.*?\)"
+    result = re.sub(pattern, "", res)
+    url_pattern = pattern = (
+        r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+    )
+    result = re.sub(url_pattern, "", result)
     result = re.sub(r"\n\n+", "\n", result)
     return result
 
+
 class GoogleSearchAli(dspy.Retrieve):
-    def __init__(self, bing_search_api_key=None, k=3, is_valid_source: Callable = None,
-                 min_char_count: int = 150, snippet_chunk_size: int = 1000, webpage_helper_max_threads=10,
-                 mkt='en-US', language='en-US', **kwargs):
+    def __init__(
+        self,
+        bing_search_api_key=None,
+        k=3,
+        is_valid_source: Callable = None,
+        min_char_count: int = 150,
+        snippet_chunk_size: int = 1000,
+        webpage_helper_max_threads=10,
+        mkt="en-US",
+        language="en-US",
+        **kwargs,
+    ):
 
         super().__init__(k=k)
         # key = os.environ.get('SEARCHKEY', 'default_value')
@@ -53,11 +65,11 @@ class GoogleSearchAli(dspy.Retrieve):
             },
             "headers": {"__d_head_qto": 5000},
         }
-        
+
         self.webpage_helper = WebPageHelper(
             min_char_count=min_char_count,
             snippet_chunk_size=snippet_chunk_size,
-            max_thread_num=webpage_helper_max_threads
+            max_thread_num=webpage_helper_max_threads,
         )
         self.usage = 0
 
@@ -71,9 +83,11 @@ class GoogleSearchAli(dspy.Retrieve):
         usage = self.usage
         self.usage = 0
 
-        return {'BingSearch': usage}
+        return {"BingSearch": usage}
 
-    def forward(self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []):
+    def forward(
+        self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []
+    ):
 
         queries = (
             [query_or_queries]
@@ -97,38 +111,53 @@ class GoogleSearchAli(dspy.Retrieve):
                         headers=self.header,
                     )
                     response = json.loads(response.text)
-                    search_results = response['data']['docs']
+                    search_results = response["data"]["docs"]
                     for result in search_results:
-                        url_to_results[result['url']] = {
-                            'url': result['url'],
-                            'title': result['title'],
-                            'description': result.get('snippet', '')
+                        url_to_results[result["url"]] = {
+                            "url": result["url"],
+                            "title": result["title"],
+                            "description": result.get("snippet", ""),
                         }
                 except Exception as e:
                     retries += 1
                     RETRY_DELAY = random.uniform(0, 10)
                     logging.error(f"Error occurred when searching query {query}: {e}")
                     if retries < MAX_RETRIES:
-                        logging.info(f"Retrying ({retries}/{MAX_RETRIES}) after {RETRY_DELAY} seconds...")
+                        logging.info(
+                            f"Retrying ({retries}/{MAX_RETRIES}) after {RETRY_DELAY} seconds..."
+                        )
                         time.sleep(RETRY_DELAY)
                     else:
-                        logging.error(f"Max retries reached for query {query}. Skipping.")
+                        logging.error(
+                            f"Max retries reached for query {query}. Skipping."
+                        )
 
-        valid_url_to_snippets = self.webpage_helper.urls_to_snippets(list(url_to_results.keys()))
+        valid_url_to_snippets = self.webpage_helper.urls_to_snippets(
+            list(url_to_results.keys())
+        )
         collected_results = []
         for url in valid_url_to_snippets:
             r = url_to_results[url]
-            r['snippets'] = valid_url_to_snippets[url]['snippets']
+            r["snippets"] = valid_url_to_snippets[url]["snippets"]
             collected_results.append(r)
 
-        print(f'lengt of collected_results :{len(collected_results)}')
+        print(f"lengt of collected_results :{len(collected_results)}")
         return collected_results
-    
+
 
 class BingSearchAli(dspy.Retrieve):
-    def __init__(self, bing_search_api_key=None, k=3, is_valid_source: Callable = None,
-                 min_char_count: int = 150, snippet_chunk_size: int = 1000, webpage_helper_max_threads=10,
-                 mkt='en-US', language='en-US', **kwargs):
+    def __init__(
+        self,
+        bing_search_api_key=None,
+        k=3,
+        is_valid_source: Callable = None,
+        min_char_count: int = 150,
+        snippet_chunk_size: int = 1000,
+        webpage_helper_max_threads=10,
+        mkt="en-US",
+        language="en-US",
+        **kwargs,
+    ):
         """
         Params:
             min_char_count: Minimum character count for the article to be considered valid.
@@ -140,23 +169,19 @@ class BingSearchAli(dspy.Retrieve):
         super().__init__(k=k)
         if not bing_search_api_key and not os.environ.get("SEARCH_ALI_API_KEY"):
             raise RuntimeError(
-                "You must supply bing_search_api_key or set environment variable SEARCH_ALI_API_KEY")
+                "You must supply bing_search_api_key or set environment variable SEARCH_ALI_API_KEY"
+            )
         elif bing_search_api_key:
             self.bing_api_key = bing_search_api_key
         else:
             self.bing_api_key = os.environ["SEARCH_ALI_API_KEY"]
         self.endpoint = "https://idealab.alibaba-inc.com/api/v1/search/search"
         self.count = k
-        self.params = {
-            'mkt': mkt,
-            "setLang": language,
-            "count": k,
-            **kwargs
-        }
+        self.params = {"mkt": mkt, "setLang": language, "count": k, **kwargs}
         self.webpage_helper = WebPageHelper(
             min_char_count=min_char_count,
             snippet_chunk_size=snippet_chunk_size,
-            max_thread_num=webpage_helper_max_threads
+            max_thread_num=webpage_helper_max_threads,
         )
         self.usage = 0
 
@@ -170,9 +195,11 @@ class BingSearchAli(dspy.Retrieve):
         usage = self.usage
         self.usage = 0
 
-        return {'BingSearch': usage}
+        return {"BingSearch": usage}
 
-    def forward(self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []):
+    def forward(
+        self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []
+    ):
         """Search with Bing for self.k top passages for query or queries
 
         Args:
@@ -198,12 +225,9 @@ class BingSearchAli(dspy.Retrieve):
                 "country": "US",
                 "locale": "en-US",
                 "location": "United States",
-                "page": 2
+                "page": 2,
             },
-            "platformInput": {
-                "model": "google-search",
-                "instanceVersion": "S1"
-            }
+            "platformInput": {"model": "google-search", "instanceVersion": "S1"},
         }
         header = {"X-AK": self.bing_api_key, "Content-Type": "application/json"}
 
@@ -215,30 +239,41 @@ class BingSearchAli(dspy.Retrieve):
                     headers=header,
                     json=payload_template,
                 ).json()
-                search_results = response['data']['originalOutput']['webPages']['value']
+                search_results = response["data"]["originalOutput"]["webPages"]["value"]
 
                 for result in search_results:
-                    url_to_results[result['url']] = {
-                        'url': result['url'],
-                        'title': result['name'],
-                        'description': result.get('snippet', '')
+                    url_to_results[result["url"]] = {
+                        "url": result["url"],
+                        "title": result["name"],
+                        "description": result.get("snippet", ""),
                     }
             except Exception as e:
-                logging.error(f'Error occurs when searching query {query}: {e}')
+                logging.error(f"Error occurs when searching query {query}: {e}")
 
-        valid_url_to_snippets = self.webpage_helper.urls_to_snippets(list(url_to_results.keys()))
+        valid_url_to_snippets = self.webpage_helper.urls_to_snippets(
+            list(url_to_results.keys())
+        )
         collected_results = []
         for url in valid_url_to_snippets:
             r = url_to_results[url]
-            r['snippets'] = valid_url_to_snippets[url]['snippets']
+            r["snippets"] = valid_url_to_snippets[url]["snippets"]
             collected_results.append(r)
         return collected_results
 
 
 class BingSearch(dspy.Retrieve):
-    def __init__(self, bing_search_api_key=None, k=3, is_valid_source: Callable = None,
-                 min_char_count: int = 150, snippet_chunk_size: int = 1000, webpage_helper_max_threads=10,
-                 mkt='en-US', language='en', **kwargs):
+    def __init__(
+        self,
+        bing_search_api_key=None,
+        k=3,
+        is_valid_source: Callable = None,
+        min_char_count: int = 150,
+        snippet_chunk_size: int = 1000,
+        webpage_helper_max_threads=10,
+        mkt="en-US",
+        language="en",
+        **kwargs,
+    ):
         """
         Params:
             min_char_count: Minimum character count for the article to be considered valid.
@@ -250,22 +285,18 @@ class BingSearch(dspy.Retrieve):
         super().__init__(k=k)
         if not bing_search_api_key and not os.environ.get("BING_SEARCH_API_KEY"):
             raise RuntimeError(
-                "You must supply bing_search_subscription_key or set environment variable BING_SEARCH_API_KEY")
+                "You must supply bing_search_subscription_key or set environment variable BING_SEARCH_API_KEY"
+            )
         elif bing_search_api_key:
             self.bing_api_key = bing_search_api_key
         else:
             self.bing_api_key = os.environ["BING_SEARCH_API_KEY"]
         self.endpoint = "https://api.bing.microsoft.com/v7.0/search"
-        self.params = {
-            'mkt': mkt,
-            "setLang": language,
-            "count": k,
-            **kwargs
-        }
+        self.params = {"mkt": mkt, "setLang": language, "count": k, **kwargs}
         self.webpage_helper = WebPageHelper(
             min_char_count=min_char_count,
             snippet_chunk_size=snippet_chunk_size,
-            max_thread_num=webpage_helper_max_threads
+            max_thread_num=webpage_helper_max_threads,
         )
         self.usage = 0
 
@@ -279,9 +310,11 @@ class BingSearch(dspy.Retrieve):
         usage = self.usage
         self.usage = 0
 
-        return {'BingSearch': usage}
+        return {"BingSearch": usage}
 
-    def forward(self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []):
+    def forward(
+        self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []
+    ):
         """Search with Bing for self.k top passages for query or queries
 
         Args:
@@ -300,27 +333,33 @@ class BingSearch(dspy.Retrieve):
 
         url_to_results = {}
 
-        headers = {"Ocp-Apim-Subscription-Key": self.bing_api_key , "Content-Type": "application/json" }
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.bing_api_key,
+            "Content-Type": "application/json",
+        }
 
         for query in queries:
             try:
                 results = requests.get(
-                    self.endpoint,
-                    headers=headers,
-                    params={**self.params, 'q': query}
+                    self.endpoint, headers=headers, params={**self.params, "q": query}
                 ).json()
 
-                for d in results['webPages']['value']:
-                    if self.is_valid_source(d['url']) and d['url'] not in exclude_urls:
-                        url_to_results[d['url']] = {'url': d['url'], 'title': d['name'], 'description': d['snippet']}
+                for d in results["webPages"]["value"]:
+                    if self.is_valid_source(d["url"]) and d["url"] not in exclude_urls:
+                        url_to_results[d["url"]] = {
+                            "url": d["url"],
+                            "title": d["name"],
+                            "description": d["snippet"],
+                        }
             except Exception as e:
-                logging.error(f'Error occurs when searching query {query}: {e}')
+                logging.error(f"Error occurs when searching query {query}: {e}")
 
-        valid_url_to_snippets = self.webpage_helper.urls_to_snippets(list(url_to_results.keys()))
+        valid_url_to_snippets = self.webpage_helper.urls_to_snippets(
+            list(url_to_results.keys())
+        )
         collected_results = []
         for url in valid_url_to_snippets:
             r = url_to_results[url]
-            r['snippets'] = valid_url_to_snippets[url]['snippets']
+            r["snippets"] = valid_url_to_snippets[url]["snippets"]
             collected_results.append(r)
         return collected_results
-

@@ -21,7 +21,9 @@ class OpenAIModel_dashscope(dspy.LM):
         api_key: Optional[str] = None,
         **kwargs,
     ):
-        super().__init__(model=model, api_key=api_key, base_url='https://api.gpts.vin/', **kwargs)
+        super().__init__(
+            model=model, api_key=api_key, base_url="https://api.gpts.vin/", **kwargs
+        )
         print(model)
         self.model = model
         self._token_usage_lock = threading.Lock()
@@ -77,11 +79,13 @@ class OpenAIModel_dashscope(dspy.LM):
             stream=False,
         )
         import requests
+
         max_try = 10
         for i in range(max_try):
             try:
-                ret = requests.post(CALL_URL, json=kwargs,
-                                    headers=HEADERS, timeout=1000)
+                ret = requests.post(
+                    CALL_URL, json=kwargs, headers=HEADERS, timeout=1000
+                )
                 if ret.status_code != 200:
                     raise Exception(
                         f"http status_code: {ret.status_code}\n{ret.content}"
