@@ -246,7 +246,29 @@ class ArticleTextProcessing:
             s = s.replace(f"__PLACEHOLDER_{original_citation}__", f"[{unify_citation}]")
 
         return s
+    
+    @staticmethod
+    def construct_bibliography_from_url_to_info(url_to_info):
+        """
+        Construct a bibliography from the url_to_info dictionary
 
+        Args:
+            url_to_info (dict): A dictionary containing the information of the urls
+
+        Returns:
+            str: A string containing the bibliography
+        """
+        bibliography_list = []
+        sorted_url_to_unified_index = dict(
+            sorted(url_to_info["url_to_unified_index"].items(), key=lambda item: item[1])
+        )
+        for url, index in sorted_url_to_unified_index.items():
+            # title = url_to_info["url_to_info"][url]["title"]
+            # bibliography_list.append(f"[{index}]: [{title}]() - {url}")
+            bibliography_list.append(f"[{index}]: {url}")
+        bibliography_string = "\n\n".join(bibliography_list)
+        return f"\n\n# References\n\n{bibliography_string}"
+    
     @staticmethod
     def parse_article_into_dict(input_string):
         """
