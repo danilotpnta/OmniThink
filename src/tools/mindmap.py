@@ -492,7 +492,7 @@ class MindMap:
         collected_urls and collected_snippets have corresponding indices.
         """
         self.encoder = SentenceTransformer(
-            "/mnt/nas-alinlp/xizekun/huggingface_cache/all-MiniLM-L6-v2"
+            "paraphrase-MiniLM-L6-v2"
         )
         self.collected_urls = []
         self.collected_snippets = []
@@ -755,6 +755,7 @@ if __name__ == "__main__":
     args, unknown = parser.parse_known_args()
     args.seed = 42
     args.device = "cuda"
+    args.pipeline = "omnithink"
     args.embedding_model = "Snowflake/snowflake-arctic-embed-m-v2.0"
     args.output_dir = "/home/toapantabarahonad/ds-agentic-topic-pages-gen/output/omnithink/gen_articles/SciWiki-100"
     args.result_output_dir = "/home/toapantabarahonad/ds-agentic-topic-pages-gen/output/omnithink/metrics/sources_eval_results/"
@@ -767,7 +768,6 @@ if __name__ == "__main__":
     args.topic = "Linear discriminant analysis"
     # args.topic = "Network time protocol"
 
-    args.pipeline = "omnithink"
     args.top_k = 5
     args.depth = 3
     args.max_categories = 3
