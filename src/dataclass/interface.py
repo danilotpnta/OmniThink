@@ -1,6 +1,7 @@
 import functools
 import logging
 import time
+import copy
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Dict, List, Optional, Union
@@ -13,6 +14,102 @@ logger = logging.getLogger(__name__)
 
 # This code is originally sourced from Repository STORM
 # URL: [https://github.com/stanford-oval/storm]
+
+
+class LMConfigs(ABC):
+    """Abstract base class for language model configurations of the knowledge curation engine.
+
+    The language model used for each part should be declared with a suffix '_lm' in the attribute name.
+    """
+
+    def __init__(self):
+        pass
+
+    def init_check(self):
+        for attr_name in self.__dict__:
+            if "_lm" in attr_name and getattr(self, attr_name) is None:
+                logging.warning(
+                    f"Language model for {attr_name} is not initialized. Please call set_{attr_name}()"
+                )
+
+    def collect_and_reset_lm_history(self):
+        history = []
+        for attr_name in self.__dict__:
+            if "_lm" in attr_name and hasattr(getattr(self, attr_name), "history"):
+                history.extend(getattr(self, attr_name).history)
+                getattr(self, attr_name).history = []
+
+        return history
+
+    def collect_and_reset_lm_usage(self):
+        combined_usage = []
+        for attr_name in self.__dict__:
+            if "_lm" in attr_name and hasattr(
+                getattr(self, attr_name), "get_usage_and_reset"
+            ):
+                combined_usage.append(getattr(self, attr_name).get_usage_and_reset())
+
+        model_name_to_usage = {}
+        for usage in combined_usage:
+            for model_name, tokens in usage.items():
+                if model_name not in model_name_to_usage:
+                    model_name_to_usage[model_name] = tokens
+                else:
+                    model_name_to_usage[model_name]["prompt_tokens"] += tokens[
+                        "prompt_tokens"
+                    ]
+                    model_name_to_usage[model_name]["completion_tokens"] += tokens[
+                        "completion_tokens"
+                    ]
+
+        return model_name_to_usage
+
+    def log_v0(self):
+
+        return OrderedDict(
+            {
+                attr_name: getattr(self, attr_name).kwargs
+                for attr_name in self.__dict__
+                if "_lm" in attr_name and hasattr(getattr(self, attr_name), "kwargs")
+            }
+        )
+
+    def _sanitize_kwargs(self, kwargs):
+        """Sanitize sensitive information from kwargs dictionary."""
+        sanitized = copy.deepcopy(kwargs)
+        sensitive_keys = ["api_key", "apiKey", "key", "secret", "password"]
+
+        for key in sensitive_keys:
+            if key in sanitized:
+                sanitized[key] = "your-api-key"
+        return sanitized
+
+    def log(self):
+        """Log configuration with sanitized sensitive information."""
+        config_dict = OrderedDict()
+
+        for attr_name in self.__dict__:
+            if "_lm" in attr_name and hasattr(getattr(self, attr_name), "kwargs"):
+                model = getattr(self, attr_name)
+                settings = {
+                    **model.kwargs,
+                    "model": model.model,
+                }
+                settings = {k: v for k, v in settings.items() if v is not None}
+                if "api_key" in settings:
+                    settings["api_key"] = "your-api-key"
+                config_dict[attr_name] = settings
+
+        return config_dict
+
+    def debug_print_config(self):
+        """Debug method to safely print current configuration."""
+        config = self.log()
+        print("\nCurrent LM Configurations:")
+        for model_name, settings in config.items():
+            print(f"\n{model_name}:")
+            for key, value in settings.items():
+                print(f"  {key}: {value}")
 
 
 class Information(ABC):
@@ -416,21 +513,21 @@ class Engine(ABC):
             decorated_method = self.log_execution_time_and_lm_rm_usage(original_method)
             setattr(self, method_name, decorated_method)
 
-    @abstractmethod
-    def run_knowledge_curation_module(self, **kwargs) -> Optional[InformationTable]:
-        pass
+    # @abstractmethod
+    # def run_knowledge_curation_module(self, **kwargs) -> Optional[InformationTable]:
+    #     pass
 
-    @abstractmethod
-    def run_outline_generation_module(self, **kwarg) -> article:
-        pass
+    # @abstractmethod
+    # def run_outline_generation_module(self, **kwarg) -> article:
+    #     pass
 
-    @abstractmethod
-    def run_article_generation_module(self, **kwarg) -> article:
-        pass
+    # @abstractmethod
+    # def run_article_generation_module(self, **kwarg) -> article:
+    #     pass
 
-    @abstractmethod
-    def run_article_polishing_module(self, **kwarg) -> article:
-        pass
+    # @abstractmethod
+    # def run_article_polishing_module(self, **kwarg) -> article:
+    #     pass
 
     @abstractmethod
     def run(self, **kwargs):
