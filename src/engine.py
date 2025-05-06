@@ -36,7 +36,7 @@ class OmniThinkRunnerArguments:
         metadata={"help": "Top k search results to consider for each search query."},
     )
     retrieve_top_k: int = field(
-        default=1,
+        default=3,
         metadata={"help": "Top k collected references for each section title."},
     )
     max_thread_num: int = field(
