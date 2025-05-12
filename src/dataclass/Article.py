@@ -276,6 +276,7 @@ class Article(article):
         """
         return [i.section_name for i in self.root.children]
 
+    #
     def get_leaf_nodes(self) -> List[articleSectionNode]:
         """
         Get all leaf nodes containing the given keyword in their content.

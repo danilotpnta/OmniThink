@@ -70,7 +70,7 @@ class ArticleGenerationModule:
         self,
         topic: str,
         mindmap: MindMap,
-        article_with_outline,
+        article_with_outline: Article,
         language_style={"language": "English", "style": ""},
         save_dir: str = None,
     ):
@@ -233,74 +233,6 @@ class WriteSectionAgentEnglish(dspy.Signature):
         format=str,
     )
 
-
-class WriteSectionAgentChinese(dspy.Signature):
-    """Generate a Chinese Wikipedia section adhering to standard formatting and style guidelines.
-
-    Writing specifications:
-        1. Use "#" Title" to indicate section title, "##" Title" to indicate subsection title, "###" Title" to indicate subsubsection title, and so on.
-        2. Use [1], [2], ..., [n] in line (for example, "The capital of the United States is Washington, D.C.[1][3].").
-        3. Maintain formal yet accessible Chinese language style
-        4. Follow standard Chinese Wikipedia formatting and style guidelines
-        5. Use Simplified Chinese characters and proper punctuation
-    """
-
-    info = dspy.InputField(prefix="Collected source materials:\n", format=str)
-    topic = dspy.InputField(prefix="Article topic: ", format=str)
-    section = dspy.InputField(prefix="Target section to write: ", format=str)
-    language_style = dspy.InputField(
-        prefix="Target writing style (formal Chinese): ", format=str
-    )
-    output = dspy.OutputField(
-        prefix="Generate the Chinese section with proper inline citations (start with # section title, exclude page header):\n",
-        format=str,
-    )
-
-
-class WriteSectionAgentFormalChinese(dspy.Signature):
-    """Generate a formal Chinese Wikipedia section based on the collected information.
-
-    Writing specifications:
-    1. Use "#" Title" to indicate section title, "##" Title" to indicate subsection title, "###" Title" to indicate subsubsection title, and so on.
-    2. Use [1], [2], ..., [n] in line (for example, "The capital of the United States is Washington, D.C.[1][3].").
-    3. Maintain formal and professional Chinese language style
-    4. Follow Wikipedia's neutral tone and encyclopedic writing standards
-    5. Use standard Simplified Chinese characters and proper punctuation
-    """
-
-    info = dspy.InputField(prefix="Collected source materials:\n", format=str)
-    topic = dspy.InputField(prefix="Article topic: ", format=str)
-    section = dspy.InputField(prefix="Target section to write: ", format=str)
-    language_style = dspy.InputField(
-        prefix="Target writing style (formal Chinese): ", format=str
-    )
-    output = dspy.OutputField(
-        prefix="Generate the formal Chinese section with proper inline citations (start with # section title, exclude table of contents):\n",
-        format=str,
-    )
-
-
-class WriteSectionAgentEnthusiasticChinese(dspy.Signature):
-    """Generate an engaging Chinese Wikipedia section with enthusiastic tone while maintaining factual accuracy.
-
-    Writing specifications:
-        1. Use "#" Title" to indicate section title, "##" Title" to indicate subsection title, "###" Title" to indicate subsubsection title, and so on.
-        2. Use [1], [2], ..., [n] in line (for example, "The capital of the United States is Washington, D.C.[1][3].").
-        3. Employ lively yet professional Chinese language style
-        4. Maintain Wikipedia's neutral point of view while using engaging expressions
-        5. Use appropriate rhetorical devices to enhance readability
-    """
-
-    info = dspy.InputField(prefix="Collected source materials:\n", format=str)
-    topic = dspy.InputField(prefix="Article topic: ", format=str)
-    section = dspy.InputField(prefix="Target section to write: ", format=str)
-    language_style = dspy.InputField(
-        prefix="Target writing style (enthusiastic Chinese): ", format=str
-    )
-    output = dspy.OutputField(
-        prefix="Generate the enthusiastic Chinese section with proper inline citations (start with # section title, maintain engaging tone):\n",
-        format=str,
-    )
 
 
 class WriteSectionAgentEnthusiasticEnglish(dspy.Signature):

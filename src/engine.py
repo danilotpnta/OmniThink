@@ -66,7 +66,6 @@ class OmniThinkRunnerArguments:
 
 
 class OmniThinkRunner(Engine):
-    """STORM Wiki pipeline runner."""
 
     def __init__(
         self,
