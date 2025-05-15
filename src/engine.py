@@ -88,6 +88,7 @@ class OmniThinkRunner(Engine):
         do_generate_outline=None,
         do_generate_article=None,
         do_polish_article=None,
+        do_url_outline_mapping: bool = False,
         load_mind_map=True,
         save_mind_map=False,
     ):
@@ -166,7 +167,7 @@ class OmniThinkRunner(Engine):
             article_with_outline=article_with_outline,
             save_dir=save_dir,
         )
-        
+
         ap = ArticlePolishingModule(
             article_gen_lm=self.lm,
             article_polish_lm=self.lm,
@@ -178,31 +179,28 @@ class OmniThinkRunner(Engine):
             save_dir=save_dir,
         )
 
-
     def post_run(self):
-            """
-            Post-run operations, including:
-            1. Dumping the run configuration.
-            2. Dumping the LLM call history.
-            """
-            config_log = self.lm_configs.log()
-            FileIOHelper.dump_json(
-                config_log, os.path.join(self.save_dir, "run_config.json")
-            )
+        """
+        Post-run operations, including:
+        1. Dumping the run configuration.
+        2. Dumping the LLM call history.
+        """
+        config_log = self.lm_configs.log()
+        FileIOHelper.dump_json(
+            config_log, os.path.join(self.save_dir, "run_config.json")
+        )
 
-            def custom_default(o):
-                if hasattr(o, "to_dict"):
-                    return o.to_dict()
-                try:
-                    return o.__dict__
-                except AttributeError:
-                    return str(o)
+        def custom_default(o):
+            if hasattr(o, "to_dict"):
+                return o.to_dict()
+            try:
+                return o.__dict__
+            except AttributeError:
+                return str(o)
 
-            llm_call_history = self.lm_configs.collect_and_reset_lm_history()
-            with open(
-                os.path.join(self.save_dir, "llm_call_history.jsonl"), "w"
-            ) as f:
-                for call in llm_call_history:
-                    if "kwargs" in call:
-                        call.pop("kwargs")
-                    f.write(json.dumps(call, indent=4, default=custom_default) + "\n")
+        llm_call_history = self.lm_configs.collect_and_reset_lm_history()
+        with open(os.path.join(self.save_dir, "llm_call_history.jsonl"), "w") as f:
+            for call in llm_call_history:
+                if "kwargs" in call:
+                    call.pop("kwargs")
+                f.write(json.dumps(call, indent=4, default=custom_default) + "\n")
