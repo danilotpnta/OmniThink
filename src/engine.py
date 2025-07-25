@@ -72,6 +72,7 @@ class OmniThinkRunner(Engine):
         args: OmniThinkRunnerArguments,
         lm_configs: OmniThinkLLMConfigs,
         rm,
+        draft_dir=None,
     ):
         super().__init__(lm_configs=lm_configs)
         self.args = args
@@ -84,35 +85,38 @@ class OmniThinkRunner(Engine):
     def run(
         self,
         topic,
+        ground_truth_url: str = "",
         do_research=None,
         do_generate_outline=None,
         do_generate_article=None,
         do_polish_article=None,
         do_url_outline_mapping: bool = False,
-        load_mind_map=True,
-        save_mind_map=False,
+        load_mind_map=False,
+        save_mind_map=True,
     ):
 
         topic_name = topic.replace(" ", "_")
-        manual_runs = [
-            "manual_run_2025-05-04_00-05-12",
-            "manual_run_2025-05-04_00-10-25",
-            "manual_run_2025-05-04_00-20-05",
-            "manual_run_2025-05-04_00-24-45",
-            "manual_run_2025-05-04_00-24-47",
-        ]
+        # manual_runs = [
+        #     "manual_run_2025-05-04_00-05-12",
+        #     "manual_run_2025-05-04_00-10-25",
+        #     "manual_run_2025-05-04_00-20-05",
+        #     "manual_run_2025-05-04_00-24-45",
+        #     "manual_run_2025-05-04_00-24-47",
+        #     "new_retriever_0_brave_gt_url"
+        # ]
 
         # Path ie.: ~/output/apollo/gen_articles/SciWiki-100/domain/801_job
-        if self.args.output_dir.split("/")[-1] not in manual_runs:
-            print(
-                f"Output directory {self.args.output_dir} is not in the list of manual runs."
-            )
-            return
+        # if self.args.output_dir.split("/")[-1] not in manual_runs:
+        #     print(
+        #         f"Output directory {self.args.output_dir} is not in the list of manual runs."
+        #     )
+        #     return
 
         save_dir = os.path.join(
             self.args.output_dir,
             topic_name,
         )
+        os.makedirs(save_dir, exist_ok=True) 
         self.save_dir = save_dir
 
         if load_mind_map:
@@ -129,8 +133,13 @@ class OmniThinkRunner(Engine):
                 retriever=self.retriever,
                 gen_concept_lm=self.lm,
                 depth=self.args.depth,
+                max_categories=3,
             )
-            generator = mind_map.build_map(topic)
+            generator = mind_map.build_map(
+                topic,
+                ground_truth_url,
+                debugging=True,
+            )
             for layer in generator:
                 print(layer)
 

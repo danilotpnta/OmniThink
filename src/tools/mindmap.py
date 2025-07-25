@@ -155,6 +155,7 @@ class MindPoint:
         concept: str = "",
         info: Optional[List[Dict]] = None,
         category: str = "",
+        ground_truth_url: str = "",
     ):
         self.root = root
         self.category = category
@@ -164,6 +165,7 @@ class MindPoint:
         self.lm = lm
         self.retriever = retriever
         self.concept_generator = ConceptGenerator(lm=lm)
+        self.ground_truth_url = ground_truth_url
 
     def extend(self, max_categories=3, remaining_budget=None, debugging=False):
         extend_concept = dspy.Predict(ExtendConcept)
@@ -222,8 +224,12 @@ class MindPoint:
                 break
 
             # Retrieve information
-            new_info = self.retriever(keywords_list)
+            new_info = self.retriever(
+                query=keywords_list,
+                exclude_urls=[self.ground_truth_url],
+            )
 
+            snippets_count = 0 
             if new_info:
                 snippets_count = sum(len(info.snippets) for info in new_info)
 
@@ -248,6 +254,7 @@ class MindPoint:
                 lm=self.lm,
                 retriever=self.retriever,
                 category=category,
+                ground_truth_url=self.ground_truth_url,
             )
             self.children[category] = new_node
             if debugging:
@@ -276,8 +283,18 @@ class MindMap:
         self.max_categories = max_categories
         print("MindMap initialized")
 
-    def build_map(self, topic: str, max_total_snippets=135, debugging=False):
-        root_info = self.retriever(topic)
+    def build_map(
+        self,
+        topic: str,
+        ground_truth_url: str = "",
+        max_total_snippets=135,
+        debugging=False,
+    ):
+        self.ground_truth_url = ground_truth_url
+        root_info = self.retriever(
+            query=topic,
+            exclude_urls=[self.ground_truth_url],
+        )
         root_concept = self.concept_generator(root_info)
         root = MindPoint(
             root=True,
@@ -286,6 +303,7 @@ class MindMap:
             lm=self.gen_concept_lm,
             retriever=self.retriever,
             category=topic,
+            ground_truth_url=self.ground_truth_url,
         )
         self.root = root
 
@@ -354,56 +372,6 @@ class MindMap:
             current_level = next_level
             if debugging:
                 print(f"Level {count + 1} complete. Total snippets: {total_snippets}")
-        if debugging:
-            print(f"Final total snippets: {total_snippets}")
-
-    def build_map_works(self, topic: str, max_total_snippets=135, debugging=False):
-        root_info = self.retriever(topic)
-        root_concept = self.concept_generator(root_info)
-        root = MindPoint(
-            root=True,
-            info=root_info,
-            concept=root_concept,
-            lm=self.gen_concept_lm,
-            retriever=self.retriever,
-            category=topic,
-        )
-        self.root = root
-
-        total_snippets = sum(len(info.snippets) for info in root.info)
-        current_level = [root]
-
-        for count in range(self.depth):
-            yield current_level
-
-            if count == self.depth - 1 or total_snippets >= max_total_snippets:
-                break
-
-            next_level = []
-
-            # Process nodes sequentially to maintain precise control
-            for node in current_level:
-                if total_snippets >= max_total_snippets:
-                    if debugging:
-                        print(
-                            f"Total limit reached ({total_snippets}), stopping all expansions"
-                        )
-                    break
-
-                remaining_budget = max_total_snippets - total_snippets
-                snippets_added = node.extend(
-                    max_categories=args.max_categories,
-                    remaining_budget=remaining_budget,
-                )
-                total_snippets += snippets_added
-
-                # Only add children that were actually created
-                next_level.extend(node.children.values())
-
-            current_level = next_level
-            if debugging:
-                print(f"Level {count + 1} complete. Total snippets: {total_snippets}")
-
         if debugging:
             print(f"Final total snippets: {total_snippets}")
 
@@ -491,9 +459,7 @@ class MindMap:
         Prepare collected snippets and URLs for retrieval by encoding the snippets using paraphrase-MiniLM-L6-v2.
         collected_urls and collected_snippets have corresponding indices.
         """
-        self.encoder = SentenceTransformer(
-            "paraphrase-MiniLM-L6-v2"
-        )
+        self.encoder = SentenceTransformer("paraphrase-MiniLM-L6-v2")
         self.collected_urls = []
         self.collected_snippets = []
         seen_urls = set()
